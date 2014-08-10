@@ -385,6 +385,7 @@ def SetupSsh():
   utils.Chmod('/etc/ssh/ssh_config', 644)
   utils.WriteFile('/etc/ssh/sshd_config', ETC_SSH_SSHD_CONFIG)
   utils.Chmod('/etc/ssh/sshd_config', 644)
+  utils.EnableService('sshd.service')
 
 
 def SetupFail2ban():
@@ -396,7 +397,6 @@ def SetupFail2ban():
                   ETC_FAIL2BAN_JAIL_D_SSHD_CONF)
   utils.EnableService('syslog-ng')
   utils.EnableService('fail2ban.service')
-  utils.EnableService('sshd.service')
 
 
 def ConfigureSecurity():

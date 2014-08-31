@@ -38,6 +38,7 @@ echo "Updating Cloud SDK"
 yes | gcloud components update
 
 echo "Installing Dependencies"
+sudo apt-get update
 sudo apt-get install -y -qq python3 haveged git
 
 echo "Getting source code..."

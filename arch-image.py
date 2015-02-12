@@ -343,10 +343,7 @@ def InstallBootloader(device, uuid, debugmode):
       'systemd.log_target=console',
       'systemd.journald.forward_to_syslog=yes',
       'systemd.journald.forward_to_kmsg=yes',
-      'systemd.journald.forward_to_console=yes',
-      'initcall_debug',
-      'printk.time=y',
-      'init=/usr/lib/systemd/systemd-bootchart',]
+      'systemd.journald.forward_to_console=yes',]
   boot_params = ' '.join(boot_params)
   boot_spec = '    APPEND root=UUID=%s rw append %s' % (uuid, boot_params)
   utils.ReplaceLine('/boot/syslinux/syslinux.cfg',

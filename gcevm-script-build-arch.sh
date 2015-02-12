@@ -37,9 +37,23 @@ mkdir -p ${BUILDER_ROOT}
 echo "Updating Cloud SDK"
 yes | gcloud components update
 
-echo "Installing Dependencies"
-sudo apt-get update
-sudo apt-get install -y -qq python3 haveged git
+function InstallDependenciesForDebian {
+  echo "Installing Dependencies (Debian)"
+  apt-get update
+  apt-get install -y -qq python3 haveged git
+}
+
+function InstallDependenciesForRedhat {
+  echo "Installing Dependencies (Redhat)"
+  rpm -Uvh http://download.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-5.noarch.rpm
+  yum install -y python3 haveged git
+}
+if [ -f /etc/redhat-release ]
+then
+  InstallDependenciesForRedhat
+else
+  InstallDependenciesForDebian
+fi
 
 echo "Getting source code..."
 git clone ${GIT_SOURCE_URI} ${BUILDER_ROOT}
@@ -48,6 +62,21 @@ cd ${BUILDER_ROOT}
 haveged -w 1024
 gsutil rm ${REMOTE_IMAGE}
 ./build-gce-arch.py ${SCRIPT_PARAMS}
-cat /var/log/syslog | grep -o "startupscript.*" > builder.log
+
+function SaveLogForRedhat {
+  journalctl > builder.log
+}
+
+function SaveLogForDebian {
+  cat /var/log/syslog | grep -o "startupscript.*" > builder.log
+}
+
+if [ -f /etc/redhat-release ]
+then
+  SaveLogForRedhat
+else
+  SaveLogForDebian
+fi
+
 gsutil cp builder.log ${REMOTE_IMAGE}.log
 gcloud compute -q instances delete ${INSTANCE_NAME} --zone ${ZONE_NAME}

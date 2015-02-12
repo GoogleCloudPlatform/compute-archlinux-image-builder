@@ -25,7 +25,8 @@ COMPUTE_IMAGE_PACKAGES_GIT_URL = (
     'https://github.com/GoogleCloudPlatform/compute-image-packages.git')
 IMAGE_FILE='disk.raw'
 SETUP_PACKAGES_ESSENTIAL = 'grep file'.split()
-SETUP_PACKAGES = 'pacman wget gcc make parted git setconf libaio sudo'.split()
+SETUP_PACKAGES = ('pacman wget gcc make parted git setconf libaio sudo '
+                 'fakeroot').split()
 IMAGE_PACKAGES = ('base tar wget '
                   'curl sudo mkinitcpio syslinux dhcp ethtool irqbalance '
                   'ntp psmisc openssh udev less bash-completion zip unzip '

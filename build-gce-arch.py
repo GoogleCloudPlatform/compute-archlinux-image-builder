@@ -212,7 +212,7 @@ def PrepareBootstrap(workspace_dir, mirror_server, use_pacman_keys):
     utils.ReplaceLine(os.path.join(arch_root, 'etc/pacman.conf'), 'SigLevel', 'SigLevel = Never')
   # Install the most basic utilities for the bootstrapper.
   utils.RunChroot(arch_root,
-                  'pacman --noconfirm -Sy python3')
+                  'pacman --noconfirm -Sy python3 sed')
 
   return arch_root
 

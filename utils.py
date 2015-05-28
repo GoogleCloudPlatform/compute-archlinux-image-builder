@@ -226,11 +226,14 @@ def Symlink(source_file, dest_file):
 
 
 def AurInstall(name=None, pkbuild_url=None):
+  InstallNeededPackages(['base-devel'])
   if name:
     pkbuild_url = 'https://aur.archlinux.org/packages/%s/%s/PKGBUILD' % (name.lower()[:2], name.lower())
   workspace_dir = CreateTempDirectory()
+  Run(['chgrp', 'nobody', workspace_dir])
+  Run(['chmod', '-R', 'g+rwx', workspace_dir])
   DownloadFile(pkbuild_url, os.path.join(workspace_dir, 'PKGBUILD'))
-  Run(['makepkg', '--asroot'], cwd=workspace_dir)
+  Run(['sudo', '-u', 'nobody', 'makepkg'], cwd=workspace_dir)
   tarball = glob.glob(os.path.join(workspace_dir, '*.tar*'))
   tarball = tarball[0]
   Pacman(['-U', tarball], cwd=workspace_dir)
@@ -248,6 +251,10 @@ def Pacman(params, cwd=None):
 
 def InstallPackages(package_list):
   Pacman(['-S'] + package_list)
+
+
+def InstallNeededPackages(package_list):
+  Pacman(['-S', '--needed'] + package_list)
 
 
 def SetupArchLocale():

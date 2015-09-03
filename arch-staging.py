@@ -15,9 +15,11 @@
 # limitations under the License.
 
 
-import logging
+import argparse
 import os
+import logging
 import sys
+from datetime import date
 
 import utils
 
@@ -26,7 +28,7 @@ COMPUTE_IMAGE_PACKAGES_GIT_URL = (
 IMAGE_FILE='disk.raw'
 SETUP_PACKAGES_ESSENTIAL = 'grep file'.split()
 SETUP_PACKAGES = ('pacman wget gcc make parted git setconf libaio sudo '
-                 'fakeroot').split()
+                 'fakeroot arch-install-scripts').split()
 IMAGE_PACKAGES = ('base tar wget '
                   'curl sudo mkinitcpio syslinux dhcp ethtool irqbalance '
                   'ntp psmisc openssh udev less bash-completion zip unzip '
@@ -34,13 +36,32 @@ IMAGE_PACKAGES = ('base tar wget '
 
 
 def main():
-  args = utils.DecodeArgs(sys.argv[1])
-  utils.SetupLogging(quiet=args['quiet'], verbose=args['verbose'])
-  logging.info('Setup Bootstrapper Environment')
-  utils.SetupArchLocale()
-  InstallPackagesForStagingEnvironment()
+  args = ParseArgs()
+  utils.SetupLogging(quiet=args.quiet, verbose=args.verbose)
+  logging.info('Arch Linux Image Builder')
+  logging.info('========================')
+  
+  workspace_dir = None
+  image_file = None
+  try:
+    InstallPackagesForStagingEnvironment()
+    image_path = CreateArchImage(args)
+    image_name, image_filename, image_description = GetImageNameAndDescription(
+        args.outfile)
+    image_file = SaveImage(image_path, image_filename)
+    if args.upload and image_file:
+      UploadImage(image_file, args.upload, make_public=args.public)
+      if args.register:
+        AddImageToComputeEngineProject(
+            image_name, args.upload, image_description)
+  finally:
+    if not args.nocleanup and workspace_dir:
+      utils.DeleteDirectory(workspace_dir)
+
+
+def CreateArchImage(args):
   image_path = os.path.join(os.getcwd(), IMAGE_FILE)
-  CreateImage(image_path, size_gb=int(args['size_gb']))
+  CreateBlankImage(image_path, size_gb=int(args.size_gb), fs_type=args.fs_type)
   mount_path = utils.CreateTempDirectory(base_dir='/')
   image_mapping = utils.ImageMapper(image_path, mount_path)
   try:
@@ -53,7 +74,7 @@ def main():
       utils.CreateDirectory('/run/shm')
       utils.CreateDirectory(os.path.join(mount_path, 'run', 'shm'))
       InstallArchLinux(mount_path)
-      disk_uuid = SetupFileSystem(mount_path, image_mapping_path)
+      disk_uuid = SetupFileSystem(mount_path, image_mapping_path, args.fs_type)
       ConfigureArchInstall(
           args, mount_path, primary_mapping['parent'], disk_uuid)
       utils.DeleteDirectory(os.path.join(mount_path, 'run', 'shm'))
@@ -65,6 +86,7 @@ def main():
     image_mapping.Unmap()
   utils.Run(['parted', image_path, 'set', '1', 'boot', 'on'])
   utils.Sync()
+  return image_path
 
 
 def ConfigureArchInstall(args, mount_path, parent_path, disk_uuid):
@@ -78,10 +100,13 @@ def ConfigureArchInstall(args, mount_path, parent_path, disk_uuid):
     'packages_dir': '/%s' % packages_dir,
     'device': parent_path,
     'disk_uuid': disk_uuid,
-    'accounts': args['accounts'],
-    'debugmode': args['debugmode'],
+    'accounts': args.accounts,
+    'debugmode': args.debug,
+    'quiet': args.quiet,
+    'verbose': args.verbose,
+    'packages': args.packages,
+    'size_gb': args.size_gb
   }
-  params.update(args)
   config_arch_py = os.path.join(
       '/', relative_builder_path, 'arch-image.py')
   utils.RunChroot(mount_path,
@@ -93,12 +118,12 @@ def ConfigureArchInstall(args, mount_path, parent_path, disk_uuid):
 def InstallPackagesForStagingEnvironment():
   utils.InstallPackages(SETUP_PACKAGES_ESSENTIAL)
   utils.InstallPackages(SETUP_PACKAGES)
-  utils.SetupArchLocale()
+  utils.RemoveBuildUser()
   utils.AurInstall(name='multipath-tools-git')
   utils.AurInstall(name='zerofree')
 
 
-def CreateImage(image_path, size_gb=10, fs_type='ext4'):
+def CreateBlankImage(image_path, size_gb=10, fs_type='ext4'):
   utils.LogStep('Create Image')
   utils.Run(['rm', '-f', image_path])
   utils.Run(['truncate', image_path, '--size=%sG' % size_gb])
@@ -118,7 +143,7 @@ def InstallArchLinux(base_dir):
   utils.Pacstrap(base_dir, IMAGE_PACKAGES)
 
 
-def SetupFileSystem(base_dir, image_mapping_path):
+def SetupFileSystem(base_dir, image_mapping_path, fs_type):
   utils.LogStep('File Systems')
   _, fstab_contents, _ = utils.Run(['genfstab', '-p', base_dir],
                                    capture_output=True)
@@ -129,7 +154,7 @@ def SetupFileSystem(base_dir, image_mapping_path):
                               capture_output=True)
   disk_uuid = disk_uuid.strip()
   utils.WriteFile(os.path.join(base_dir, 'etc', 'fstab'),
-                  'UUID=%s   /   ext4   defaults   0   1' % disk_uuid)
+                  'UUID=%s   /   %s   defaults   0   1' % (disk_uuid, fs_type))
   utils.Run(['tune2fs', '-i', '1', '-U', disk_uuid, image_mapping_path])
   return disk_uuid
 
@@ -144,5 +169,114 @@ def ShrinkDisk(image_mapping_path):
   utils.LogStep('Shrink Disk')
   utils.Run(['zerofree', image_mapping_path])
 
+
+def SaveImage(arch_root, image_filename):
+  utils.LogStep('Save Arch Linux Image in GCE format')
+  source_image_raw = os.path.join(arch_root, 'disk.raw')
+  image_raw = os.path.join(os.getcwd(), 'disk.raw')
+  image_file = os.path.join(os.getcwd(), image_filename)
+  utils.Run(['cp', '--sparse=always', source_image_raw, image_raw])
+  utils.Run(['tar', '-Szcf', image_file, 'disk.raw'])
+  return image_file
+
+
+def UploadImage(image_path, gs_path, make_public=False):
+  utils.LogStep('Upload Image to Cloud Storage')
+  utils.SecureDeleteFile('~/.gsutil/*.url')
+  utils.Run(['gsutil', 'rm', gs_path])
+  utils.Run(['gsutil', 'cp', image_path, gs_path])
+  if make_public:
+    utils.Run(['gsutil', 'acl', 'set', 'public-read', gs_path])
+
+
+def AddImageToComputeEngineProject(image_name, gs_path, description):
+  utils.LogStep('Add image to project')
+  utils.Run(['gcloud', 'compute', 'images', 'delete', image_name, '-q'])
+  utils.Run(['gcloud', 'compute', 'images', 'create', image_name, '-q',
+             '--source-uri', gs_path,
+             '--description', description])
+
+
+def GetImageNameAndDescription(outfile_name):
+  today = date.today()
+  isodate = today.strftime("%Y-%m-%d")
+  yyyymmdd = today.strftime("%Y%m%d")
+  image_name = 'arch-v%s' % yyyymmdd
+  if outfile_name:
+    image_filename = outfile_name
+  else:
+    image_filename = '%s.tar.gz' % image_name
+  description = 'Arch Linux x86-64 built on %s' % isodate
+  return image_name, image_filename, description
+
+
+def ParseArgs():
+  parser = argparse.ArgumentParser(
+      description='Arch Linux Image Builder for Compute Engine')
+  parser.add_argument('-p', '--packages',
+                      dest='packages',
+                      nargs='+',
+                      help='Additional packages to install via Pacman.')
+  parser.add_argument('-v', '--verbose',
+                      dest='verbose',
+                      default=False,
+                      help='Verbose console output.',
+                      action='store_true')
+  parser.add_argument('-q', '--quiet',
+                      dest='quiet',
+                      default=False,
+                      help='Suppress all console output.',
+                      action='store_true')
+  parser.add_argument('--upload',
+                      dest='upload',
+                      default=None,
+                      help='Google Cloud Storage path to upload to.')
+  parser.add_argument('--size_gb',
+                      dest='size_gb',
+                      default=10,
+                      help='Volume size of image (in GiB).')
+  parser.add_argument('--accounts',
+                      dest='accounts',
+                      nargs='+',
+                      help='Space delimited list of user accounts to create on '
+                      'the image. Format: username:password')
+  parser.add_argument('--nocleanup',
+                      dest='nocleanup',
+                      default=False,
+                      help='Prevent cleaning up the image build workspace '
+                           'after image has been created.',
+                      action='store_true')
+  parser.add_argument('--outfile',
+                      dest='outfile',
+                      default=None,
+                      help='Name of the output image file.')
+  parser.add_argument('--debug',
+                      dest='debug',
+                      default=False,
+                      help='Configure the image for debugging.',
+                      action='store_true')
+  parser.add_argument('--public',
+                      dest='public',
+                      default=False,
+                      help='Make image file uploaded to Cloud Storage '
+                           'available for everyone.',
+                      action='store_true')
+  parser.add_argument('--register',
+                      dest='register',
+                      default=False,
+                      help='Add the image to Compute Engine project. '
+                           '(Upload to Cloud Storage required.)',
+                      action='store_true')
+  parser.add_argument('--nopacmankeys',
+                      dest='nopacmankeys',
+                      default=False,
+                      help='Disables signature checking for pacman packages.',
+                      action='store_true')
+  parser.add_argument('--fs_type',
+                      dest='fs_type',
+                      default='ext4',
+                      help='Verbose console output.',
+                      action='store_true')
+  return parser.parse_args()
 
 main()

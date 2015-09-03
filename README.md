@@ -6,6 +6,9 @@ The image is configured close to the recommendations listed on [Building an imag
 
 These scripts are written in Python3.
 
+## Premade Image
+arch-v20150903 - [gs://jeremyje/archlinux-images/arch-v20150903.tar.gz](https://storage.googleapis.com/jeremyje/archlinux-images/arch-v20150903.tar.gz)
+
 ## Usage
 
 ### Install and Configure Cloud SDK (one time setup)
@@ -35,10 +38,6 @@ gsutil mb gs://${BUCKET}
 # Install Required Packages
 # Arch Linux
 sudo pacman -S python haveged
-# Debian
-sudo apt-get -y install python3 haveged
-# Redhat
-sudo yum install -y python3 haveged
 
 ./build-gce-arch.py --verbose
 # Upload to Cloud Storage
@@ -58,3 +57,7 @@ gcloud compute images insert archlinux \
 
 ## Licensing
 All files in this repository are under the [Apache License, Version 2.0](LICENSE) unless noted otherwise.
+
+
+## Disclaimer
+Google Inc. does not provide any support or guarnatees for this project or the images provided.

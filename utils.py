@@ -80,14 +80,22 @@ def UserExists(username):
     return False
 
 
-def CreateBuildUser():
-  if not UserExists(BUILDER_USER):
-    Run(['useradd', BUILDER_USER, '-d', '/home/%s' % BUILDER_USER])
+def CreateBuildUser(user=BUILDER_USER):
+  if not UserExists(user):
+    home_dir = '/home/%s' % user
+    Run(['useradd', user, '-d', home_dir])
+    Run(['mkdir', home_dir])
+    Run(['chown', '%s:%s' % (user, user), home_dir])
+
+
+def RemoveBuildUser():
+  if UserExists(BUILDER_USER):
+    Run(['userdel', '-r', BUILDER_USER])
 
 
 def Run(params, cwd=None, capture_output=False, shell=False, env=None, wait=True):
   try:
-    logging.debug(params)
+    logging.debug('Run: %s in %s', params, cwd)
     if env:
       new_env = os.environ.copy()
       new_env.update(env)
@@ -165,8 +173,13 @@ def DeleteFileFunc(file_pattern, delete_func):
     delete_func(item)
 
 
+def DirectoryExists(dir_path):
+  return os.path.exists(dir_path)
+
+
 def DeleteDirectory(dir_path):
-  shutil.rmtree(dir_path)
+  if DirectoryExists(dir_path):
+    shutil.rmtree(dir_path)
 
 
 def CreateTempDirectory(base_dir=None):
@@ -251,11 +264,11 @@ def ChangeDirectoryOwner(username, directory):
 def AurInstall(name=None, pkbuild_url=None):
   CreateBuildUser()
   if name:
-    pkbuild_url = 'https://aur.archlinux.org/packages/%s/%s/PKGBUILD' % (name.lower()[:2], name.lower())
+    pkbuild_url = 'https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=%s' % (name.lower())
   workspace_dir = CreateTempDirectory()
   DownloadFile(pkbuild_url, os.path.join(workspace_dir, 'PKGBUILD'))
   ChangeDirectoryOwner(BUILDER_USER, workspace_dir)
-  Run(['runuser', '-l', BUILDER_USER, '-c', 'makepkg'], cwd=workspace_dir)
+  Run(['runuser', '-m', BUILDER_USER, '-c', 'makepkg'], cwd=workspace_dir)
   tarball = glob.glob(os.path.join(workspace_dir, '*.tar*'))
   tarball = tarball[0]
   Pacman(['-U', tarball], cwd=workspace_dir)
@@ -267,7 +280,6 @@ def Pacstrap(base_dir, params):
 
 
 def Pacman(params, cwd=None):
-  #, '--debug'
   Run(['pacman', '--noconfirm'] + params, cwd=cwd)
 
 

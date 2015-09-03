@@ -60,4 +60,4 @@ All files in this repository are under the [Apache License, Version 2.0](LICENSE
 
 
 ## Disclaimer
-Google Inc. does not provide any support or guarnatees for this project or the images provided.
+Google Inc. does not provide any support or guarantees for this project or the images provided.

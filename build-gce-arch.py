@@ -183,22 +183,25 @@ def SaveImage(arch_root, image_filename):
 def UploadImage(image_path, gs_path, make_public=False):
   utils.LogStep('Upload Image to Cloud Storage')
   utils.SecureDeleteFile('~/.gsutil/*.url')
-  utils.Run(['gsutil', 'rm', gs_path])
-  utils.Run(['gsutil', 'cp', image_path, gs_path])
+  utils.Run(['gsutil', 'rm', gs_path],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+  utils.Run(['gsutil', 'cp', image_path, gs_path],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
   if make_public:
-    utils.Run(['gsutil', 'acl', 'set', 'public-read', gs_path])
+    utils.Run(['gsutil', 'acl', 'set', 'public-read', gs_path],
+        env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
 
 
 def AddImageToComputeEngineProject(image_name, gs_path, description):
   utils.LogStep('Add image to project')
   utils.Run(
-    ['gcloud', 'compute', 'images', 'delete', image_name, '-q'],
-    env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+      ['gcloud', 'compute', 'images', 'delete', image_name, '-q'],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
   utils.Run(
-    ['gcloud', 'compute', 'images', 'create', image_name, '-q',
-     '--source-uri', gs_path,
-     '--description', description],
-    env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+      ['gcloud', 'compute', 'images', 'create', image_name, '-q',
+       '--source-uri', gs_path,
+       '--description', description],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
 
 
 def GetImageNameAndDescription(outfile_name):

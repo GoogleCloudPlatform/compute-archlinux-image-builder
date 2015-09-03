@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import logging
+import pwd
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,7 @@ import urllib.request, urllib.error, urllib.parse
 
 
 APP_NAME = 'archbuilder'
+BUILDER_USER = APP_NAME
 ETC_LOCALE_GEN = '''
 en_US.UTF-8 UTF-8
 en_US ISO-8859-1
@@ -70,9 +72,30 @@ def SudoRun(params, cwd=None, capture_output=False):
   return Run(params, capture_output=capture_output)
 
 
+def UserExists(username):
+  try:
+    pwd.getpwnam(username)
+    return True
+  except:
+    return False
+
+
+def CreateBuildUser(user=BUILDER_USER):
+  if not UserExists(user):
+    home_dir = '/home/%s' % user
+    Run(['useradd', user, '-d', home_dir])
+    Run(['mkdir', home_dir])
+    Run(['chown', '%s:%s' % (user, user), home_dir])
+
+
+def RemoveBuildUser():
+  if UserExists(BUILDER_USER):
+    Run(['userdel', '-r', BUILDER_USER])
+
+
 def Run(params, cwd=None, capture_output=False, shell=False, env=None, wait=True):
   try:
-    logging.debug(params)
+    logging.debug('Run: %s in %s', params, cwd)
     if env:
       new_env = os.environ.copy()
       new_env.update(env)
@@ -103,7 +126,7 @@ def Run(params, cwd=None, capture_output=False, shell=False, env=None, wait=True
 
 
 def DownloadFile(url, file_path):
-  Run(['wget', '-O', file_path, url])
+  Run(['wget', '-O', file_path, url, '-nv'])
 
 
 def HttpGet(url):
@@ -150,8 +173,13 @@ def DeleteFileFunc(file_pattern, delete_func):
     delete_func(item)
 
 
+def DirectoryExists(dir_path):
+  return os.path.exists(dir_path)
+
+
 def DeleteDirectory(dir_path):
-  shutil.rmtree(dir_path)
+  if DirectoryExists(dir_path):
+    shutil.rmtree(dir_path)
 
 
 def CreateTempDirectory(base_dir=None):
@@ -207,9 +235,9 @@ def DebugBash():
 
 
 def DebugPrintFile(file_path):
-  logging.info('==================================================================================')
+  logging.info('==============================================================')
   logging.info('File: %s', file_path)
-  logging.info('==================================================================================')
+  logging.info('==============================================================')
   Run(['cat', file_path])
 
 
@@ -218,19 +246,29 @@ def Sync():
 
 
 def EnableService(service_name):
-    Run(['systemctl', 'enable', service_name])
+  Run(['systemctl', 'enable', service_name])
+
+
+def DisableService(service_name):
+  Run(['systemctl', 'disable', service_name])
 
 
 def Symlink(source_file, dest_file):
   Run(['ln', '-s', source_file, dest_file])
 
 
+def ChangeDirectoryOwner(username, directory):
+  SudoRun(['chown', '-R', username, directory])
+
+
 def AurInstall(name=None, pkbuild_url=None):
+  CreateBuildUser()
   if name:
-    pkbuild_url = 'https://aur.archlinux.org/packages/%s/%s/PKGBUILD' % (name.lower()[:2], name.lower())
+    pkbuild_url = 'https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=%s' % (name.lower())
   workspace_dir = CreateTempDirectory()
   DownloadFile(pkbuild_url, os.path.join(workspace_dir, 'PKGBUILD'))
-  Run(['makepkg', '--asroot'], cwd=workspace_dir)
+  ChangeDirectoryOwner(BUILDER_USER, workspace_dir)
+  Run(['runuser', '-m', BUILDER_USER, '-c', 'makepkg'], cwd=workspace_dir)
   tarball = glob.glob(os.path.join(workspace_dir, '*.tar*'))
   tarball = tarball[0]
   Pacman(['-U', tarball], cwd=workspace_dir)
@@ -242,7 +280,6 @@ def Pacstrap(base_dir, params):
 
 
 def Pacman(params, cwd=None):
-  #, '--debug'
   Run(['pacman', '--noconfirm'] + params, cwd=cwd)
 
 

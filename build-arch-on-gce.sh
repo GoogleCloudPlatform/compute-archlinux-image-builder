@@ -46,10 +46,10 @@ function PrintHelp() {
 function DeployVm() {
   echo "Creating Instance, ${INSTANCE_NAME}"
   gcloud compute instances create ${INSTANCE_NAME} \
-    --image debian-7-backports \
+    --image ubuntu-14-10 \
     --machine-type ${MACHINE_TYPE} \
     --zone ${ZONE_NAME} \
-    --metadata-from-file startup-script=build-arch-on-gce-remote.sh \
+    --metadata-from-file startup-script=gcevm-script-build-arch.sh \
     --metadata \
     script-params="${SCRIPT_PARAMS}" \
     instance-name="${INSTANCE_NAME}" \

@@ -4,3 +4,5 @@
 *.pyc
 *.raw
 __pycache__/*
+.c9/*
+

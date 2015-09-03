@@ -261,6 +261,7 @@ def main():
   ConfigMessageOfTheDay()
   ConfigureSecurity()
   ConfigureSerialPortOutput()
+  DisableUnusedServices()
   OptimizePackages()
 
 
@@ -284,7 +285,7 @@ def OptimizePackages():
 
 
 def SetupLocale():
-  utils.LogStep('Set Locale  to US English (UTF-8)')
+  utils.LogStep('Set Locale to US English (UTF-8)')
   utils.SetupArchLocale()
 
 
@@ -307,9 +308,6 @@ def ConfigureKernel():
 
 def InstallBootloader(device, uuid, debugmode):
   utils.LogStep('Install Syslinux bootloader')
-  '''
-  utils.Run(['syslinux-install_update', '-i', '-a', '-m'])
-  '''
   utils.Run(['blkid', '-s', 'PTTYPE', '-o', 'value', device])
   utils.CreateDirectory('/boot/syslinux')
   utils.CopyFiles('/usr/lib/syslinux/bios/*.c32', '/boot/syslinux/')
@@ -352,7 +350,10 @@ def InstallBootloader(device, uuid, debugmode):
                     'APPEND root=',
                     boot_spec)
 
-
+def DisableUnusedServices():
+  utils.DisableService('getty@tty1.service')
+  utils.DisableService('graphical.target')
+  
 def ForwardSystemdToConsole():
   utils.LogStep('Installing syslinux bootloader')
   utils.AppendFile('/etc/systemd/journald.conf', 'ForwardToConsole=yes')

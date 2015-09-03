@@ -15,43 +15,40 @@
 # limitations under the License.
 
 
-"""Arch Linux Image Builder for GCE.
-
-This script creates a clean Arch Linux image that can be used in Google Compute
-Engine.
-
-Usage: ./build-gce-arch.py -> archlinux-***.tar.gz
-       ./build-gce-arch.py --packages docker
-       ./build-gce-arch.py --help -> Detailed help.
-"""
 import argparse
 import os
 import logging
+import sys
 from datetime import date
 
 import utils
 
-
-DEFAULT_MIRROR = 'http://mirrors.kernel.org/archlinux/$repo/os/$arch'
-#DEFAULT_MIRROR = 'http://mirror.us.leaseweb.net/archlinux/$repo/os/$arch'
-TARGET_ARCH = 'x86_64'
+COMPUTE_IMAGE_PACKAGES_GIT_URL = (
+    'https://github.com/GoogleCloudPlatform/compute-image-packages.git')
+IMAGE_FILE='disk.raw'
+SETUP_PACKAGES_ESSENTIAL = 'grep file'.split()
+SETUP_PACKAGES = ('pacman wget gcc make parted git setconf libaio sudo '
+                 'fakeroot arch-install-scripts').split()
+IMAGE_PACKAGES = ('base tar wget '
+                  'curl sudo mkinitcpio syslinux dhcp ethtool irqbalance '
+                  'ntp psmisc openssh udev less bash-completion zip unzip '
+                  'python2 python3').split()
 
 
 def main():
   args = ParseArgs()
   utils.SetupLogging(quiet=args.quiet, verbose=args.verbose)
+  logging.info('Arch Linux Image Builder')
+  logging.info('========================')
+  
   workspace_dir = None
   image_file = None
   try:
-    workspace_dir = utils.CreateTempDirectory()
-    bootstrap_file = DownloadArchBootstrap(args.bootstrap)
-    utils.Untar(bootstrap_file, workspace_dir)
-    arch_root = PrepareBootstrap(workspace_dir, args.mirror, not args.nopacmankeys)
-    relative_builder_path = utils.CopyBuilder(arch_root)
-    ChrootIntoArchAndBuild(arch_root, relative_builder_path, args)
+    InstallPackagesForStagingEnvironment()
+    image_path = CreateArchImage(args)
     image_name, image_filename, image_description = GetImageNameAndDescription(
         args.outfile)
-    image_file = SaveImage(arch_root, image_filename)
+    image_file = SaveImage(image_path, image_filename)
     if args.upload and image_file:
       UploadImage(image_file, args.upload, make_public=args.public)
       if args.register:
@@ -61,7 +58,165 @@ def main():
     if not args.nocleanup and workspace_dir:
       utils.DeleteDirectory(workspace_dir)
 
-  
+
+def CreateArchImage(args):
+  image_path = os.path.join(os.getcwd(), IMAGE_FILE)
+  CreateBlankImage(image_path, size_gb=int(args.size_gb), fs_type=args.fs_type)
+  mount_path = utils.CreateTempDirectory(base_dir='/')
+  image_mapping = utils.ImageMapper(image_path, mount_path)
+  try:
+    image_mapping.Map()
+    primary_mapping = image_mapping.GetFirstMapping()
+    image_mapping_path = primary_mapping['path']
+    FormatImage(image_mapping_path)
+    try:
+      image_mapping.Mount()
+      utils.CreateDirectory('/run/shm')
+      utils.CreateDirectory(os.path.join(mount_path, 'run', 'shm'))
+      InstallArchLinux(mount_path)
+      disk_uuid = SetupFileSystem(mount_path, image_mapping_path, args.fs_type)
+      ConfigureArchInstall(
+          args, mount_path, primary_mapping['parent'], disk_uuid)
+      utils.DeleteDirectory(os.path.join(mount_path, 'run', 'shm'))
+      PurgeDisk(mount_path)
+    finally:
+      image_mapping.Unmount()
+    ShrinkDisk(image_mapping_path)
+  finally:
+    image_mapping.Unmap()
+  utils.Run(['parted', image_path, 'set', '1', 'boot', 'on'])
+  utils.Sync()
+  return image_path
+
+
+def ConfigureArchInstall(args, mount_path, parent_path, disk_uuid):
+  relative_builder_path = utils.CopyBuilder(mount_path)
+  utils.LogStep('Download compute-image-packages')
+  packages_dir = utils.CreateTempDirectory(mount_path)
+  utils.Run(['git', 'clone', COMPUTE_IMAGE_PACKAGES_GIT_URL, packages_dir])
+  utils.CreateDirectory(os.path.join(mount_path, ''))
+  packages_dir = os.path.relpath(packages_dir, mount_path)
+  params = {
+    'packages_dir': '/%s' % packages_dir,
+    'device': parent_path,
+    'disk_uuid': disk_uuid,
+    'accounts': args.accounts,
+    'debugmode': args.debug,
+    'quiet': args.quiet,
+    'verbose': args.verbose,
+    'packages': args.packages,
+    'size_gb': args.size_gb
+  }
+  config_arch_py = os.path.join(
+      '/', relative_builder_path, 'arch-image.py')
+  utils.RunChroot(mount_path,
+                  '%s "%s"' % (config_arch_py, utils.EncodeArgs(params)),
+                  use_custom_path=False)
+  utils.DeleteDirectory(os.path.join(mount_path, relative_builder_path))
+
+
+def InstallPackagesForStagingEnvironment():
+  utils.InstallPackages(SETUP_PACKAGES_ESSENTIAL)
+  utils.InstallPackages(SETUP_PACKAGES)
+  utils.RemoveBuildUser()
+  utils.AurInstall(name='multipath-tools-git')
+  utils.AurInstall(name='zerofree')
+
+
+def CreateBlankImage(image_path, size_gb=10, fs_type='ext4'):
+  utils.LogStep('Create Image')
+  utils.Run(['rm', '-f', image_path])
+  utils.Run(['truncate', image_path, '--size=%sG' % size_gb])
+  utils.Run(['parted', image_path, 'mklabel', 'msdos'])
+  utils.Run(['parted', image_path, 'mkpart', 'primary',
+             fs_type, '1', str(int(size_gb) * 1024)])
+
+
+def FormatImage(image_mapping_path):
+  utils.LogStep('Format Image')
+  utils.Run(['mkfs', image_mapping_path])
+  utils.Sync()
+
+
+def InstallArchLinux(base_dir):
+  utils.LogStep('Install Arch Linux')
+  utils.Pacstrap(base_dir, IMAGE_PACKAGES)
+
+
+def SetupFileSystem(base_dir, image_mapping_path, fs_type):
+  utils.LogStep('File Systems')
+  _, fstab_contents, _ = utils.Run(['genfstab', '-p', base_dir],
+                                   capture_output=True)
+  utils.WriteFile(os.path.join(base_dir, 'etc', 'fstab'), fstab_contents)
+  _, disk_uuid, _ = utils.Run(['blkid', '-s', 'UUID',
+                               '-o', 'value',
+                               image_mapping_path],
+                              capture_output=True)
+  disk_uuid = disk_uuid.strip()
+  utils.WriteFile(os.path.join(base_dir, 'etc', 'fstab'),
+                  'UUID=%s   /   %s   defaults   0   1' % (disk_uuid, fs_type))
+  utils.Run(['tune2fs', '-i', '1', '-U', disk_uuid, image_mapping_path])
+  return disk_uuid
+
+
+def PurgeDisk(mount_path):
+  paths = ['/var/cache', '/var/log', '/var/lib/pacman/sync']
+  for path in paths:
+    utils.DeleteDirectory(os.path.join(mount_path, path))
+
+
+def ShrinkDisk(image_mapping_path):
+  utils.LogStep('Shrink Disk')
+  utils.Run(['zerofree', image_mapping_path])
+
+
+def SaveImage(arch_root, image_filename):
+  utils.LogStep('Save Arch Linux Image in GCE format')
+  source_image_raw = os.path.join(arch_root, 'disk.raw')
+  image_raw = os.path.join(os.getcwd(), 'disk.raw')
+  image_file = os.path.join(os.getcwd(), image_filename)
+  utils.Run(['cp', '--sparse=always', source_image_raw, image_raw])
+  utils.Run(['tar', '-Szcf', image_file, 'disk.raw'])
+  return image_file
+
+
+def UploadImage(image_path, gs_path, make_public=False):
+  utils.LogStep('Upload Image to Cloud Storage')
+  utils.SecureDeleteFile('~/.gsutil/*.url')
+  utils.Run(['gsutil', 'rm', gs_path],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+  utils.Run(['gsutil', 'cp', image_path, gs_path],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+  if make_public:
+    utils.Run(['gsutil', 'acl', 'set', 'public-read', gs_path],
+        env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+
+
+def AddImageToComputeEngineProject(image_name, gs_path, description):
+  utils.LogStep('Add image to project')
+  utils.Run(
+      ['gcloud', 'compute', 'images', 'delete', image_name, '-q'],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+  utils.Run(
+      ['gcloud', 'compute', 'images', 'create', image_name, '-q',
+       '--source-uri', gs_path,
+       '--description', description],
+      env={'CLOUDSDK_PYTHON': '/usr/bin/python2'})
+
+
+def GetImageNameAndDescription(outfile_name):
+  today = date.today()
+  isodate = today.strftime("%Y-%m-%d")
+  yyyymmdd = today.strftime("%Y%m%d")
+  image_name = 'arch-v%s' % yyyymmdd
+  if outfile_name:
+    image_filename = outfile_name
+  else:
+    image_filename = '%s.tar.gz' % image_name
+  description = 'Arch Linux x86-64 built on %s' % isodate
+  return image_name, image_filename, description
+
+
 def ParseArgs():
   parser = argparse.ArgumentParser(
       description='Arch Linux Image Builder for Compute Engine')
@@ -69,14 +224,6 @@ def ParseArgs():
                       dest='packages',
                       nargs='+',
                       help='Additional packages to install via Pacman.')
-  parser.add_argument('--mirror',
-                      dest='mirror',
-                      default=DEFAULT_MIRROR,
-                      help='Mirror to download packages from.')
-  parser.add_argument('--bootstrap',
-                      dest='bootstrap',
-                      help='Arch Linux Bootstrap tarball. '
-                           '(default: Download latest version)')
   parser.add_argument('-v', '--verbose',
                       dest='verbose',
                       default=False,
@@ -132,113 +279,12 @@ def ParseArgs():
                       default=False,
                       help='Disables signature checking for pacman packages.',
                       action='store_true')
+  parser.add_argument('--fs_type',
+                      dest='fs_type',
+                      default='ext4',
+                      help='Verbose console output.',
+                      action='store_true')
   return parser.parse_args()
-
-
-def DownloadArchBootstrap(bootstrap_tarball):
-  utils.LogStep('Download Arch Linux Bootstrap')
-  if bootstrap_tarball:
-    url = bootstrap_tarball
-    sha1sum = None
-  else:
-    url, sha1sum = GetLatestBootstrapUrl()
-  logging.debug('Downloading %s', url)
-  local_bootstrap = os.path.join(os.getcwd(), os.path.basename(url))
-  if os.path.isfile(local_bootstrap):
-    logging.debug('Using local file instead.')
-    if sha1sum and utils.Sha1Sum(local_bootstrap) == sha1sum:
-      return local_bootstrap
-  utils.DownloadFile(url, local_bootstrap)
-  if not sha1sum or utils.Sha1Sum(local_bootstrap) != sha1sum:
-      raise ValueError('Bad checksum')
-  return local_bootstrap
-
-
-def ChrootIntoArchAndBuild(arch_root, relative_builder_path, args):
-  params = {
-    'quiet': args.quiet,
-    'verbose': args.verbose,
-    'packages': args.packages,
-    'mirror': args.mirror,
-    'accounts': args.accounts,
-    'debugmode': args.debug,
-    'size_gb': args.size_gb
-  }
-  chroot_archenv_script = os.path.join('/', relative_builder_path,
-                                       'arch-staging.py')
-  utils.RunChroot(arch_root,
-                  '%s "%s"' % (chroot_archenv_script, utils.EncodeArgs(params)))
-  logging.debug('Bootstrap Chroot: sudo %s/bin/arch-chroot %s/',
-                arch_root, arch_root)
-
-
-def SaveImage(arch_root, image_filename):
-  utils.LogStep('Save Arch Linux Image in GCE format')
-  source_image_raw = os.path.join(arch_root, 'disk.raw')
-  image_raw = os.path.join(os.getcwd(), 'disk.raw')
-  image_file = os.path.join(os.getcwd(), image_filename)
-  utils.Run(['cp', '--sparse=always', source_image_raw, image_raw])
-  utils.Run(['tar', '-Szcf', image_file, 'disk.raw'])
-  return image_file
-
-
-def UploadImage(image_path, gs_path, make_public=False):
-  utils.LogStep('Upload Image to Cloud Storage')
-  utils.SecureDeleteFile('~/.gsutil/*.url')
-  utils.Run(['gsutil', 'rm', gs_path])
-  utils.Run(['gsutil', 'cp', image_path, gs_path])
-  if make_public:
-    utils.Run(['gsutil', 'acl', 'set', 'public-read', gs_path])
-
-
-def AddImageToComputeEngineProject(image_name, gs_path, description):
-  utils.LogStep('Add image to project')
-  utils.Run(['gcloud', 'compute', 'images', 'delete', image_name, '-q'])
-  utils.Run(['gcloud', 'compute', 'images', 'create', image_name, '-q',
-             '--source-uri', gs_path,
-             '--description', description])
-
-def PrepareBootstrap(workspace_dir, mirror_server, use_pacman_keys):
-  utils.LogStep('Setting up Bootstrap Environment')
-  arch_root = os.path.join(workspace_dir, os.listdir(workspace_dir)[0])
-  mirrorlist = 'Server = {MIRROR_SERVER}'.format(MIRROR_SERVER=mirror_server)
-  utils.AppendFile(os.path.join(arch_root, 'etc/pacman.d/mirrorlist'),
-                   mirrorlist)
-  utils.CreateDirectory(os.path.join(arch_root, 'run/shm'))
-  if use_pacman_keys:
-    utils.RunChroot(arch_root, 'pacman-key --init')
-    utils.RunChroot(arch_root, 'pacman-key --populate archlinux')
-  else:
-    utils.ReplaceLine(os.path.join(arch_root, 'etc/pacman.conf'), 'SigLevel', 'SigLevel = Never')
-  # Install the most basic utilities for the bootstrapper.
-  utils.RunChroot(arch_root,
-                  'pacman --noconfirm -Sy python3')
-
-  return arch_root
-
-
-def GetLatestBootstrapUrl():
-  base_url = 'http://mirrors.kernel.org/archlinux/iso/latest/'
-  sha1sums = utils.HttpGet(base_url + 'sha1sums.txt')
-  items = sha1sums.splitlines()
-  for item in items:
-    if TARGET_ARCH in item and 'bootstrap' in item:
-      entries = item.split()
-      return base_url + entries[1], entries[0]
-  raise RuntimeError('Cannot find Arch bootstrap url')
-
-
-def GetImageNameAndDescription(outfile_name):
-  today = date.today()
-  isodate = today.strftime("%Y-%m-%d")
-  yyyymmdd = today.strftime("%Y%m%d")
-  image_name = 'arch-v%s' % yyyymmdd
-  if outfile_name:
-    image_filename = outfile_name
-  else:
-    image_filename = '%s.tar.gz' % image_name
-  description = 'Arch Linux x86-64 built on %s' % isodate
-  return image_name, image_filename, description
 
 
 main()

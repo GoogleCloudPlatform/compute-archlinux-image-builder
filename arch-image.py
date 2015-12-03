@@ -242,7 +242,6 @@ class Arch(linux.LinuxPlatform):
     super(Arch, self).__init__()
 '''
 
-
 def main():
   args = utils.DecodeArgs(sys.argv[1])
   utils.SetupLogging(quiet=args['quiet'], verbose=args['verbose'])
@@ -257,6 +256,7 @@ def main():
   SetupSsh()
   #SetupFail2ban()
   SetupAccounts(args)
+  #InstallImportedPackages(args['packages_dir'])
   InstallGcePackages(args['packages_dir'])
   ConfigMessageOfTheDay()
   ConfigureSecurity()
@@ -432,6 +432,12 @@ def ConfigureSerialPortOutput():
   utils.ReplaceLine('/boot/syslinux/syslinux.cfg', 'TIMEOUT', 'TIMEOUT 1')
 
 
+def InstallImportedPackages(packages_dir):
+  aur_packages_dir = os.path.join(packages_dir, 'aur')
+  for aur_package in os.listdir(aur_packages_dir):
+    utils.Pacman('-U', aur_package, cwd=aur_packages_dir)
+
+
 def InstallGcePackages(packages_dir):
   try:
     InstallGoogleCloudSdk()
@@ -519,4 +525,5 @@ def ConfigMessageOfTheDay():
   utils.WriteFile('/etc/motd', ETC_MOTD)
 
 
-main()
+if __name__ == '__main__':
+  main()

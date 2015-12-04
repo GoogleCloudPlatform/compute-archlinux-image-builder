@@ -21,7 +21,7 @@ You can use [Cloud SDK](https://cloud.google.com/sdk/) to add the prebuilt
 images to your project. To do that run the following command.
 
 ```
-gcloud compute images insert arch-v20151203 \
+gcloud compute images create arch-v20151203 \
   --source-uri gs://gce-arch-images/arch-v20151203.tar.gz \
   --description "Arch Linux built on 2015-12-03"
 ```

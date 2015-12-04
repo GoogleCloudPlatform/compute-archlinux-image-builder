@@ -22,7 +22,7 @@ images to your project. To do that run the following command.
 
 ```
 gcloud compute images insert arch-v20151203 \
-  --source-uri gs://jeremyje/archlinux-images/arch-v20151203.tar.gz \
+  --source-uri gs://gce-arch-images/arch-v20151203.tar.gz \
   --description "Arch Linux built on 2015-12-03"
 ```
 

@@ -1,13 +1,30 @@
 ## Arch Linux Image Builder for GCE
 
-Creates an Arch Linux image that can run on Google Compute Engine.
+This project is a collection of scripts that create an Arch Linux OS image that
+can run on [Google Compute Engine](https://cloud.google.com/compute/).
 
-The image is configured close to the recommendations listed on [Building an image from scratch](https://developers.google.com/compute/docs/images#buildingimage).
+The image is configured close to the recommendations listed on
+[Building an image from scratch](https://developers.google.com/compute/docs/images#buildingimage).
 
 These scripts are written in Python3.
 
-## Premade Image
-arch-v20150903 - [gs://jeremyje/archlinux-images/arch-v20150903.tar.gz](https://storage.googleapis.com/jeremyje/archlinux-images/arch-v20150903.tar.gz)
+## Prebuilt Images
+ * arch-v20151203 - [gs://gce-arch-images/arch-v20151203.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151203.tar.gz)
+ * arch-v20151103 - [gs://gce-arch-images/arch-v20151103.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151103.tar.gz)
+ * arch-v20151023 - [gs://gce-arch-images/arch-v20151023.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151023.tar.gz)
+ * arch-v20150903 - [gs://gce-arch-images/arch-v20150903.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20150903.tar.gz)
+
+You can add these images using the
+[Developers Console](https://console.developers.google.com/compute/imagesAdd).
+
+You can use [Cloud SDK](https://cloud.google.com/sdk/) to add the prebuilt
+images to your project. To do that run the following command.
+
+```
+gcloud compute images insert arch-v20151203 \
+  --source-uri gs://jeremyje/archlinux-images/arch-v20151203.tar.gz \
+  --description "Arch Linux built on 2015-12-03"
+```
 
 ## Usage
 
@@ -33,31 +50,16 @@ gsutil ls gs://
 gsutil mb gs://${BUCKET}
 ```
 
-### Locally
-```
-# Install Required Packages
-# Arch Linux
-sudo pacman -S python haveged
-
-./build-gce-arch.py --verbose
-# Upload to Cloud Storage
-gsutil cp archlinux-gce.tar.gz gs://${BUCKET}/archlinux.tar.gz
-
-# Add image to project
-gcloud compute images insert archlinux \
-  --source-uri gs://${BUCKET}/archlinux.tar.gz \
-  --description "Arch Linux for Compute Engine"
-```
-
-
-## Contributing changes
+## Contributing Changes
 
 * See [CONTRIB.md](CONTRIB.md)
 
 
 ## Licensing
-All files in this repository are under the [Apache License, Version 2.0](LICENSE) unless noted otherwise.
+All files in this repository are under the
+[Apache License, Version 2.0](LICENSE) unless noted otherwise.
 
 
-## Disclaimer
-Google Inc. does not provide any support or guarantees for this project or the images provided.
+## Support
+Google Inc. does not provide any support, guarantees, or warranty for this
+project or the images provided.

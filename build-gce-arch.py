@@ -44,8 +44,8 @@ def main():
   workspace_dir = None
   image_file = None
   try:
-    InstallPackagesForStagingEnvironment()
-    image_path = CreateArchImage(args)
+    aur_packages = InstallPackagesOnHostMachine()
+    image_path = CreateArchImage(args, aur_packages)
     image_name, image_filename, image_description = GetImageNameAndDescription(
         args.outfile)
     image_file = SaveImage(image_path, image_filename)
@@ -59,12 +59,13 @@ def main():
       utils.DeleteDirectory(workspace_dir)
 
 
-def CreateArchImage(args):
+def CreateArchImage(args, aur_packages):
   image_path = os.path.join(os.getcwd(), IMAGE_FILE)
   CreateBlankImage(image_path, size_gb=int(args.size_gb), fs_type=args.fs_type)
   mount_path = utils.CreateTempDirectory(base_dir='/')
   image_mapping = utils.ImageMapper(image_path, mount_path)
   try:
+    image_mapping.InstallLoopback()
     image_mapping.Map()
     primary_mapping = image_mapping.GetFirstMapping()
     image_mapping_path = primary_mapping['path']
@@ -76,7 +77,7 @@ def CreateArchImage(args):
       InstallArchLinux(mount_path)
       disk_uuid = SetupFileSystem(mount_path, image_mapping_path, args.fs_type)
       ConfigureArchInstall(
-          args, mount_path, primary_mapping['parent'], disk_uuid)
+          args, mount_path, primary_mapping['parent'], disk_uuid, aur_packages)
       utils.DeleteDirectory(os.path.join(mount_path, 'run', 'shm'))
       PurgeDisk(mount_path)
     finally:
@@ -89,12 +90,14 @@ def CreateArchImage(args):
   return image_path
 
 
-def ConfigureArchInstall(args, mount_path, parent_path, disk_uuid):
+def ConfigureArchInstall(args, mount_path, parent_path, disk_uuid, aur_packages):
   relative_builder_path = utils.CopyBuilder(mount_path)
-  utils.LogStep('Download compute-image-packages')
   packages_dir = utils.CreateTempDirectory(mount_path)
   utils.Run(['git', 'clone', COMPUTE_IMAGE_PACKAGES_GIT_URL, packages_dir])
   utils.CreateDirectory(os.path.join(mount_path, ''))
+  aur_packages_dir = os.path.join(packages_dir, 'aur')
+  for aur_package in aur_packages:
+    utils.CopyFiles(aur_package, aur_packages_dir + '/')
   packages_dir = os.path.relpath(packages_dir, mount_path)
   params = {
     'packages_dir': '/%s' % packages_dir,
@@ -115,12 +118,16 @@ def ConfigureArchInstall(args, mount_path, parent_path, disk_uuid):
   utils.DeleteDirectory(os.path.join(mount_path, relative_builder_path))
 
 
-def InstallPackagesForStagingEnvironment():
+def InstallPackagesOnHostMachine():
+  aur_packages = []
+  utils.UpdatePacmanDatabase()
   utils.InstallPackages(SETUP_PACKAGES_ESSENTIAL)
   utils.InstallPackages(SETUP_PACKAGES)
-  utils.RemoveBuildUser()
-  utils.AurInstall(name='multipath-tools-git')
-  utils.AurInstall(name='zerofree')
+  utils.UpdateAllPackages()
+  aur_packages.append(utils.AurInstall(name='multipath-tools-git'))
+  aur_packages.append(utils.AurInstall(name='zerofree'))
+  aur_packages.append(utils.AurInstall(name='python2-crcmod'))
+  return aur_packages
 
 
 def CreateBlankImage(image_path, size_gb=10, fs_type='ext4'):
@@ -170,14 +177,12 @@ def ShrinkDisk(image_mapping_path):
   utils.Run(['zerofree', image_mapping_path])
 
 
-def SaveImage(arch_root, image_filename):
+def SaveImage(disk_image_file, image_filename):
   utils.LogStep('Save Arch Linux Image in GCE format')
-  source_image_raw = os.path.join(arch_root, 'disk.raw')
-  image_raw = os.path.join(os.getcwd(), 'disk.raw')
-  image_file = os.path.join(os.getcwd(), image_filename)
-  utils.Run(['cp', '--sparse=always', source_image_raw, image_raw])
-  utils.Run(['tar', '-Szcf', image_file, 'disk.raw'])
-  return image_file
+  image_raw = os.path.join(os.getcwd(), IMAGE_FILE)
+  gce_image_file = os.path.join(os.getcwd(), image_filename)
+  utils.Run(['tar', '-Szcf', image_filename, IMAGE_FILE])
+  return gce_image_file
 
 
 def UploadImage(image_path, gs_path, make_public=False):
@@ -287,4 +292,5 @@ def ParseArgs():
   return parser.parse_args()
 
 
-main()
+if __name__ == '__main__':
+  main()

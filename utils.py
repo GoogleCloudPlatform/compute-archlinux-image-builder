@@ -30,7 +30,7 @@ import urllib.request, urllib.error, urllib.parse
 
 
 APP_NAME = 'archbuilder'
-BUILDER_USER = APP_NAME
+BUILDER_USER = 'nobody'
 ETC_LOCALE_GEN = '''
 en_US.UTF-8 UTF-8
 en_US ISO-8859-1
@@ -78,19 +78,6 @@ def UserExists(username):
     return True
   except:
     return False
-
-
-def CreateBuildUser(user=BUILDER_USER):
-  if not UserExists(user):
-    home_dir = '/home/%s' % user
-    Run(['useradd', user, '-d', home_dir])
-    Run(['mkdir', home_dir])
-    Run(['chown', '%s:%s' % (user, user), home_dir])
-
-
-def RemoveBuildUser():
-  if UserExists(BUILDER_USER):
-    Run(['userdel', '-r', BUILDER_USER])
 
 
 def Run(params, cwd=None, capture_output=False, shell=False, env=None, wait=True):
@@ -262,7 +249,6 @@ def ChangeDirectoryOwner(username, directory):
 
 
 def AurInstall(name=None, pkbuild_url=None):
-  CreateBuildUser()
   if name:
     pkbuild_url = 'https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=%s' % (name.lower())
   workspace_dir = CreateTempDirectory()
@@ -272,6 +258,7 @@ def AurInstall(name=None, pkbuild_url=None):
   tarball = glob.glob(os.path.join(workspace_dir, '*.tar*'))
   tarball = tarball[0]
   Pacman(['-U', tarball], cwd=workspace_dir)
+
   return tarball
 
 
@@ -282,6 +269,13 @@ def Pacstrap(base_dir, params):
 def Pacman(params, cwd=None):
   Run(['pacman', '--noconfirm'] + params, cwd=cwd)
 
+
+def UpdatePacmanDatabase():
+  Pacman(['-Sy'])
+
+
+def UpdateAllPackages():
+  Pacman(['-Syyu'])
 
 def InstallPackages(package_list):
   Pacman(['-S'] + package_list)
@@ -304,6 +298,9 @@ class ImageMapper(object):
   def _LoadPartitionsIfNeeded(self):
     if not self._device_map:
       self.LoadPartitions()
+
+  def InstallLoopback(self):
+    SudoRun(['modprobe', 'loop'])
 
   def LoadPartitions(self):
     return_code, out, err = SudoRun(['kpartx', '-l', self._raw_disk], capture_output=True)

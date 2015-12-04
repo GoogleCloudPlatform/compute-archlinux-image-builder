@@ -80,25 +80,6 @@ def UserExists(username):
     return False
 
 
-def CreateBuildUser(user=BUILDER_USER):
-  if user == BUILDER_USER:
-    logging.warning('Skipping create user.')
-    return
-  if not UserExists(user):
-    home_dir = '/home/%s' % user
-    Run(['useradd', user, '-d', home_dir])
-    Run(['mkdir', home_dir])
-    Run(['chown', '%s:%s' % (user, user), home_dir])
-
-
-def RemoveBuildUser():
-  if True:
-    logging.warning('Skipping delete user.')
-    return
-  if UserExists(BUILDER_USER):
-    Run(['userdel', '-r', BUILDER_USER])
-
-
 def Run(params, cwd=None, capture_output=False, shell=False, env=None, wait=True):
   try:
     logging.debug('Run: %s in %s', params, cwd)
@@ -268,7 +249,6 @@ def ChangeDirectoryOwner(username, directory):
 
 
 def AurInstall(name=None, pkbuild_url=None):
-  CreateBuildUser()
   if name:
     pkbuild_url = 'https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=%s' % (name.lower())
   workspace_dir = CreateTempDirectory()
@@ -278,8 +258,7 @@ def AurInstall(name=None, pkbuild_url=None):
   tarball = glob.glob(os.path.join(workspace_dir, '*.tar*'))
   tarball = tarball[0]
   Pacman(['-U', tarball], cwd=workspace_dir)
-  
-  RemoveBuildUser()
+
   return tarball
 
 

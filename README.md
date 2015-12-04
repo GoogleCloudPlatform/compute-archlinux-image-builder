@@ -9,9 +9,10 @@ The image is configured close to the recommendations listed on
 These scripts are written in Python3.
 
 ## Prebuilt Images
-
- * arch-v20151023 - [gs://jeremyje/archlinux-images/arch-v20151023.tar.gz](https://storage.googleapis.com/jeremyje/archlinux-images/arch-v20151023.tar.gz)
- * arch-v20150903 - [gs://jeremyje/archlinux-images/arch-v20150903.tar.gz](https://storage.googleapis.com/jeremyje/archlinux-images/arch-v20150903.tar.gz)
+ * arch-v20151203 - [gs://gce-arch-images/arch-v20151203.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151203.tar.gz)
+ * arch-v20151103 - [gs://gce-arch-images/arch-v20151103.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151103.tar.gz)
+ * arch-v20151023 - [gs://gce-arch-images/arch-v20151023.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151023.tar.gz)
+ * arch-v20150903 - [gs://gce-arch-images/arch-v20150903.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20150903.tar.gz)
 
 You can add these images using the
 [Developers Console](https://console.developers.google.com/compute/imagesAdd).
@@ -20,9 +21,9 @@ You can use [Cloud SDK](https://cloud.google.com/sdk/) to add the prebuilt
 images to your project. To do that run the following command.
 
 ```
-gcloud compute images insert arch-v20151023 \
-  --source-uri gs://jeremyje/archlinux-images/arch-v20151023.tar.gz \
-  --description "Arch Linux built on 2015-10-23"
+gcloud compute images insert arch-v20151203 \
+  --source-uri gs://jeremyje/archlinux-images/arch-v20151203.tar.gz \
+  --description "Arch Linux built on 2015-12-03"
 ```
 
 ## Usage

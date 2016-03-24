@@ -370,6 +370,8 @@ def SetupNetwork():
   utils.WriteFile('/etc/hosts', ETC_HOSTS)
   utils.WriteFile('/etc/sysctl.d/70-disable-ipv6.conf',
                   ETC_SYSCTL_D_70_DISABLE_IPV6_CONF)
+  # https://wiki.archlinux.org/index.php/Network_configuration#Reverting_to_traditional_device_names
+  utils.Symlink('/dev/null', '/etc/udev/rules.d/80-net-setup-link.rules')
   utils.EnableService('dhcpcd.service')
   utils.EnableService('systemd-networkd.service')
   utils.EnableService('systemd-networkd-wait-online.service')

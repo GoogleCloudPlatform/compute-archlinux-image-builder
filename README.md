@@ -9,7 +9,7 @@ The image is configured close to the recommendations listed on
 These scripts are written in Python3.
 
 ## Prebuilt Images
- * arch-v20160502 - [gs://gce-arch-images/arch-v20151203.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20160502.tar.gz)
+ * arch-v20160502 - [gs://gce-arch-images/arch-v20160502.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20160502.tar.gz)
  * arch-v20151203 - [gs://gce-arch-images/arch-v20151203.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151203.tar.gz)
  * arch-v20151103 - [gs://gce-arch-images/arch-v20151103.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151103.tar.gz)
  * arch-v20151023 - [gs://gce-arch-images/arch-v20151023.tar.gz](https://storage.googleapis.com/gce-arch-images/arch-v20151023.tar.gz)

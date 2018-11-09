@@ -98,7 +98,7 @@ You can now create new instances with your custom image:
 $ gcloud compute instances create INSTANCE_NAME --image=IMAGE_NAME
 ```
 
-The Google Cloud Storage file is no longer needed, so you can delete if you
+The Google Cloud Storage file is no longer needed, so you can delete it if you
 want:
 
   ```console

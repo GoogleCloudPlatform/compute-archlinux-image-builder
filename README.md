@@ -38,8 +38,9 @@ Arch Linux installation are the following:
 - Root partition and filesystem are automatically extended at boot using
   [growpart](https://launchpad.net/cloud-utils), to support dynamic disk
   resizing.
-- An additional Pacman repository is used to install and keep the Linux Guest
-  Environment and growpart packages up to date.
+- An additional Pacman repository is used to install and keep the [Linux Guest
+  Environment](https://aur.archlinux.org/packages/google-compute-engine/) and
+  [growpart](https://aur.archlinux.org/packages/growpart/) packages up to date.
 
 
 ## Prebuilt Images

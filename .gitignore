@@ -1,8 +1,0 @@
-# Files to ignore
-*.log
-*.tar.gz
-*.pyc
-*.raw
-__pycache__/*
-.c9/*
-

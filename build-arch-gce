@@ -139,6 +139,11 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 		google-accounts-daemon google-clock-skew-daemon google-instance-setup \
 		google-network-daemon google-shutdown-scripts google-startup-scripts
 
+	echo "-- setting MTU"
+	cat <<-'EOF' > /etc/udev/rules.d/10-network.rules
+		ACTION=="add", SUBSYSTEM=="net", KERNEL=="en*", ATTR{mtu}="1460"
+	EOF
+
 	echo "-- Configuring initcpio."
 	gawk -i assert -i inplace '
 		/^MODULES=/ { $0 = "MODULES=(virtio_pci virtio_scsi sd_mod ext4)"; ++f1 }

@@ -162,12 +162,6 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 		GRUB_DISABLE_RECOVERY=true
 	EOF
 	grub-mkconfig -o /boot/grub/grub.cfg
-
-	# Workaround a bug where shutdown gets stuck on failed DNS resolution.
-	gawk -i assert -i inplace '
-		/^hosts:/ && sub(/\s*resolve \[!UNAVAIL=return\]/, "") { ++f }
-		{ print } END { assert(f == 1, "f == 1") }' /etc/nsswitch.conf
-
 EOS
 
 echo "- Cleaning up and finalizing the image."

@@ -67,7 +67,7 @@ append_gce_repo() {
 cp /etc/pacman.conf "$work_dir"
 append_gce_repo "$work_dir/pacman.conf"
 pacstrap -G -M -C "$work_dir/pacman.conf" -- "$mount_dir" \
-	base grub dhclient openssh sudo rng-tools google-compute-engine growpart
+	base linux grub dhclient openssh sudo rng-tools google-compute-engine growpart
 append_gce_repo "$mount_dir/etc/pacman.conf"
 
 echo "- Configuring fstab."

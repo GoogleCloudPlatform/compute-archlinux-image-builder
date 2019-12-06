@@ -67,8 +67,7 @@ append_gce_repo() {
 cp /etc/pacman.conf "$work_dir"
 append_gce_repo "$work_dir/pacman.conf"
 pacstrap -G -M -C "$work_dir/pacman.conf" -- "$mount_dir" \
-	base linux grub dhclient openssh sudo rng-tools google-compute-engine \
-	growpart e2fsprogs
+	base linux grub dhclient openssh sudo google-compute-engine growpart e2fsprogs
 append_gce_repo "$mount_dir/etc/pacman.conf"
 
 echo "- Configuring fstab."
@@ -136,7 +135,7 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 
 	echo "-- Enabling other services."
 	systemctl --quiet enable \
-		dhclient@ens4 rngd growpartfs@- \
+		dhclient@ens4 growpartfs@- \
 		google-accounts-daemon google-clock-skew-daemon google-instance-setup \
 		google-network-daemon google-shutdown-scripts google-startup-scripts
 

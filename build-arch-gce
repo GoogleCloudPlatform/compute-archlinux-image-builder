@@ -135,7 +135,7 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 
 	echo "-- Enabling other services."
 	systemctl --quiet enable \
-		dhclient@ens4 growpartfs@- \
+		dhclient@eth0 growpartfs@- \
 		google-accounts-daemon google-clock-skew-daemon google-instance-setup \
 		google-network-daemon google-shutdown-scripts google-startup-scripts
 
@@ -156,7 +156,7 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 	grub-install --target=i386-pc -- "$1"
 	cat <<-'EOF' > /etc/default/grub
 		# GRUB boot loader configuration
-		GRUB_CMDLINE_LINUX="console=ttyS0,38400n8 elevator=noop scsi_mod.use_blk_mq=Y"
+		GRUB_CMDLINE_LINUX="console=ttyS0,38400n8 net.ifnames=0 elevator=noop scsi_mod.use_blk_mq=Y"
 		GRUB_PRELOAD_MODULES="part_gpt part_msdos"
 		GRUB_TIMEOUT=0
 		GRUB_DISABLE_RECOVERY=true

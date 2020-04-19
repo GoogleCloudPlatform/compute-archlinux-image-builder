@@ -137,7 +137,8 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 	systemctl --quiet enable \
 		dhclient@eth0 growpartfs@- \
 		google-accounts-daemon google-clock-skew-daemon google-instance-setup \
-		google-network-daemon google-shutdown-scripts google-startup-scripts
+		google-network-daemon google-shutdown-scripts google-startup-scripts \
+		google-oslogin-cache.timer
 
 	echo "-- Configuring initcpio."
 	gawk -i assert -i inplace '

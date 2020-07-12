@@ -167,7 +167,6 @@ EOS
 
 echo "- Cleaning up and finalizing the image."
 > "$mount_dir/etc/machine-id"
-> "$mount_dir/var/lib/dbus/machine-id"
 rm -- "$mount_dir/var/log/pacman.log"
 umount -- "$mount_dir"
 unset mount_dir

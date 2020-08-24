@@ -21,7 +21,6 @@ Arch Linux installation are the following:
 - Network is configured through dhclient.
 - Systemd-timesyncd is enabled and configured to use the Compute Engine metadata
   server.
-- Rng-tools are installed and enabled to provide entropy.
 - Pacman keyring is configured to be built and initialized on first boot.
 - Pacman mirror list is taken fresh from Arch Linux servers at the time the
   image is built.

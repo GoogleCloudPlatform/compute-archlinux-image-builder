@@ -113,7 +113,7 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 
 	echo '-- Configuring pacman.'
 	curl --silent --show-error -o /etc/pacman.d/mirrorlist \
-		'https://www.archlinux.org/mirrorlist/?country=all&ip_version=4&use_mirror_status=on'
+		'https://archlinux.org/mirrorlist/?country=all&ip_version=4&use_mirror_status=on'
 	gawk -i assert -i inplace '
 		/^#Server / { $0 = substr($0, 2); ++f }
 		{ print } END { assert(f > 0, "f > 0") }' /etc/pacman.d/mirrorlist

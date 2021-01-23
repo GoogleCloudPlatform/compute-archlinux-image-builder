@@ -57,31 +57,31 @@ $ gcloud compute instances create INSTANCE_NAME \
 
 You can build the Arch Linux image yourself with the following procedure:
 
-1.  Make sure you have required dependencies installed:
+1.  Install the required dependencies and build the image
 
     ```console
     $ sudo pacman -S --needed arch-install-scripts e2fsprogs
-    ```
-
-2.  Run the image building script:
-
-    ```console
+    $ git clone https://github.com/GoogleCloudPlatform/compute-archlinux-image-builder.git
+    $ cd compute-archlinux-image-builder
     $ sudo ./build-arch-gce
     ```
 
-    If the script is successful, this will create an image file named
+    You can also use the `build-arch-gce` package from the AUR, and run
+    `sudo /usr/bin/build-arch-gce`
+
+    If the build is successful, this will create an image file named
     arch-vDATE.tar.gz in the current directory, where DATE is the current date.
 
-3.  Install and configure the [Cloud SDK](https://cloud.google.com/sdk/docs/).
+2.  Install and configure the [Cloud SDK](https://cloud.google.com/sdk/docs/).
 
-4.  Copy the image file to Google Cloud Storage:
+3.  Copy the image file to Google Cloud Storage:
 
     ```console
     $ gsutil mb gs://BUCKET_NAME
     $ gsutil cp arch-vDATE.tar.gz gs://BUCKET_NAME
     ```
 
-5.  Import the image file to Google Cloud Engine as a new custom image:
+4.  Import the image file to Google Cloud Engine as a new custom image:
 
     ```console
     $ gcloud compute images create IMAGE_NAME \

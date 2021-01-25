@@ -39,8 +39,7 @@ Arch Linux installation are the following:
   resizing.
 - An additional Pacman repository is used to install and keep the [Linux Guest
   Environment](https://aur.archlinux.org/packages/google-compute-engine/) and
-  [growpart](https://aur.archlinux.org/packages/growpart/) packages up to date.
-
+  [growpartfs](https://aur.archlinux.org/packages/growpartfs/) packages up to date.
 
 ## Prebuilt Images
 
@@ -54,42 +53,41 @@ $ gcloud compute instances create INSTANCE_NAME \
       --image-project=arch-linux-gce --image-family=arch
 ```
 
-
 ## Build Your Own Image
 
 You can build the Arch Linux image yourself with the following procedure:
 
-1. Make sure you have required dependencies installed:
+1.  Install the required dependencies and build the image
 
-   ```console
-   $ sudo pacman -S arch-install-scripts e2fsprogs
-   ```
+    ```console
+    $ sudo pacman -S --needed arch-install-scripts e2fsprogs
+    $ git clone https://github.com/GoogleCloudPlatform/compute-archlinux-image-builder.git
+    $ cd compute-archlinux-image-builder
+    $ sudo ./build-arch-gce
+    ```
 
-2. Run the image building script:
+    You can also use the `build-arch-gce` package from the AUR, and run
+    `sudo /usr/bin/build-arch-gce`
 
-   ```console
-   $ sudo ./build-arch-gce
-   ```
+    If the build is successful, this will create an image file named
+    arch-vDATE.tar.gz in the current directory, where DATE is the current date.
 
-   If the script is successful, this will create an image file named
-   arch-vDATE.tar.gz in the current directory, where DATE is the current date.
+2.  Install and configure the [Cloud SDK](https://cloud.google.com/sdk/docs/).
 
-3. Install and configure the [Cloud SDK](https://cloud.google.com/sdk/docs/).
+3.  Copy the image file to Google Cloud Storage:
 
-4. Copy the image file to Google Cloud Storage:
+    ```console
+    $ gsutil mb gs://BUCKET_NAME
+    $ gsutil cp arch-vDATE.tar.gz gs://BUCKET_NAME
+    ```
 
-  ```console
-  $ gsutil mb gs://BUCKET_NAME
-  $ gsutil cp arch-vDATE.tar.gz gs://BUCKET_NAME
-  ```
+4.  Import the image file to Google Cloud Engine as a new custom image:
 
-5. Import the image file to Google Cloud Engine as a new custom image:
-
-  ```console
-  $ gcloud compute images create IMAGE_NAME \
-        --source-uri=gs://BUCKET_NAME/arch-vDATE.tar.gz \
-        --guest-os-features=VIRTIO_SCSI_MULTIQUEUE
-  ```
+    ```console
+    $ gcloud compute images create IMAGE_NAME \
+          --source-uri=gs://BUCKET_NAME/arch-vDATE.tar.gz \
+          --guest-os-features=VIRTIO_SCSI_MULTIQUEUE
+    ```
 
 You can now create new instances with your custom image:
 
@@ -100,21 +98,18 @@ $ gcloud compute instances create INSTANCE_NAME --image=IMAGE_NAME
 The Google Cloud Storage file is no longer needed, so you can delete it if you
 want:
 
-  ```console
-  $ gsutil rm gs://BUCKET_NAME/arch-vDATE.tar.gz
-  ```
-
+```console
+$ gsutil rm gs://BUCKET_NAME/arch-vDATE.tar.gz
+```
 
 ## Contributing Changes
 
 * See [CONTRIB.md](CONTRIB.md)
 
-
 ## Licensing
 
 All files in this repository are under the [Apache License, Version
 2.0](LICENSE) unless noted otherwise.
-
 
 ## Support
 

@@ -18,14 +18,15 @@ $ gcloud auth login
 
 $ gcloud config set project arch-linux-gce
 
-$ gsutil cp "arch-v${DATE}.tar.gz" gs://arch-linux-gce
+$ gsutil cp "arch-v${DATE}.tar.gz" gs://arch-linux-gce-work
 
 $ gcloud compute images create "arch-v${DATE}" \
-    --source-uri="gs://arch-linux-gce/arch-v${DATE}.tar.gz" \
+    --source-uri="gs://arch-linux-gce-work/arch-v${DATE}.tar.gz" \
     --guest-os-features=VIRTIO_SCSI_MULTIQUEUE \
+    --description="Arch Linux built on ${DATE}." \
     --family=arch
 
-$ gsutil rm "gs://arch-linux-gce/arch-v${DATE}.tar.gz"
+$ gsutil rm "gs://arch-linux-gce-work/arch-v${DATE}.tar.gz"
 
 $ gcloud compute instances create "arch-v${DATE}-test" --image="arch-v${DATE}"
 

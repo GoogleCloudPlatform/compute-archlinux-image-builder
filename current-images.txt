@@ -1,0 +1,7 @@
+NAME            PROJECT         FAMILY  DEPRECATED  STATUS
+arch-v20200516  arch-linux-gce  arch                READY
+arch-v20200824  arch-linux-gce  arch                READY
+arch-v20210102  arch-linux-gce  arch                READY
+arch-v20210123  arch-linux-gce  arch                READY
+arch-v20210124  arch-linux-gce  arch                READY
+arch-v20220315  arch-linux-gce  arch                READY

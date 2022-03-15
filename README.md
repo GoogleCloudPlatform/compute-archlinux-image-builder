@@ -53,6 +53,8 @@ $ gcloud compute instances create INSTANCE_NAME \
       --image-project=arch-linux-gce --image-family=arch
 ```
 
+For older images, see the current_images.txt file.
+
 ## Build Your Own Image
 
 You can build the Arch Linux image yourself with the following procedure:

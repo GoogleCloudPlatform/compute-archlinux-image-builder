@@ -37,6 +37,11 @@ $ gcloud compute instances delete "arch-v${DATE}-test"
 $ gcloud compute images add-iam-policy-binding "arch-v${DATE}" \
     --member='allAuthenticatedUsers' \
     --role='roles/compute.imageUser'
+
+$ gcloud compute images list \
+    --project=arch-linux-gce \
+    --no-standard-images \
+        > current-images.txt
 ```
 
 ## Managing the Pacman repo

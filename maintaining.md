@@ -10,7 +10,7 @@ end of README.md.
 ```console
 $ DATE=$(date --utc +%Y%m%d)
 
-$ sudo pacman -S --needed arch-install-scripts e2fsprogs
+$ sudo pacman -S --needed arch-install-scripts dosfstools e2fsprogs
 
 $ sudo ./build-arch-gce
 
@@ -22,7 +22,7 @@ $ gsutil cp "arch-v${DATE}.tar.gz" gs://arch-linux-gce-work
 
 $ gcloud compute images create "arch-v${DATE}" \
     --source-uri="gs://arch-linux-gce-work/arch-v${DATE}.tar.gz" \
-    --guest-os-features=VIRTIO_SCSI_MULTIQUEUE,UEFI_COMPATIBLE,GVNIC \
+    --guest-os-features=GVNIC,UEFI_COMPATIBLE,VIRTIO_SCSI_MULTIQUEUE \
     --description="Arch Linux built on ${DATE}." \
     --family=arch
 

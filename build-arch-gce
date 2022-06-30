@@ -24,9 +24,9 @@ fi
 # Setup cleanup trap to remove all temporary data.
 cleanup() {
 	echo '- Cleaning up.'
-	[[ ${mount_dir:-} ]] && umount "$mount_dir"
+	[[ ${mount_dir:-} ]] && umount --recursive -- "$mount_dir"
 	[[ ${loop_dev:-} ]] && losetup --detach "$loop_dev"
-	[[ ${work_dir:-} ]] && rm -r "$work_dir"
+	[[ ${work_dir:-} ]] && rm -r -- "$work_dir"
 	return 0
 }
 trap cleanup EXIT
@@ -40,18 +40,27 @@ echo '- Setting up a loop device and partitioning the image.'
 loop_dev=$(losetup --find --partscan --show -- "$disk_raw")
 sfdisk --quiet -- "$loop_dev" <<-'EOF'
 	label:gpt
-	type=21686148-6449-6E6F-744E-656564454649,size=1MiB,attrs=LegacyBIOSBootable,name=bios_boot
+	type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,size=300MiB,name=efi
 	type=4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709,name=root
 EOF
 
 echo '- Formatting the root partition.'
 root_dev=${loop_dev}p2
 mkfs.ext4 -q -L root -- "$root_dev"
+tune2fs -c 0 -i 0 -- "$root_dev"
+
+echo '- Formatting the EFI partition.'
+efi_dev=${loop_dev}p1
+mkfs.vfat -F32 -n EFI -- "$efi_dev"
 
 echo '- Mounting the root partition.'
 mount_dir=$work_dir/disk.mnt
 mkdir -- "$mount_dir"
 mount -- "$root_dev" "$mount_dir"
+
+echo '- Mounting the EFI partition.'
+mkdir -- "$mount_dir/efi"
+mount -- "$efi_dev" "$mount_dir/efi"
 
 echo '- Installing Arch Linux.'
 append_gce_repo() {
@@ -67,21 +76,26 @@ append_gce_repo() {
 cp /etc/pacman.conf "$work_dir"
 append_gce_repo "$work_dir/pacman.conf"
 pacstrap -G -M -C "$work_dir/pacman.conf" -- "$mount_dir" \
-	base linux grub e2fsprogs dhclient openssh sudo google-compute-engine growpartfs
+	base linux grub dosfstools e2fsprogs dhclient openssh sudo google-compute-engine growpartfs
 append_gce_repo "$mount_dir/etc/pacman.conf"
 
 echo '- Configuring fstab.'
 root_uuid=$(lsblk --noheadings --raw --output UUID -- "$root_dev")
-{
-	printf '# LABEL=%s\n' root
-	printf 'UUID=%-20s' "$root_uuid"
-	printf '\t%-10s' / ext4 defaults
-	printf '\t%s %s' 0 1
+efi_uuid=$(lsblk --noheadings --raw --output UUID -- "$efi_dev")
+print_fstab() {
+	printf '# LABEL=%s\n' "$1"
+	printf 'UUID=%-20s' "$2"
+	printf '\t%-10s' "$3" "$4" "$5"
+	printf '\t%s %s' "$6" "$7"
 	printf '\n\n'
 } >> "$mount_dir/etc/fstab"
+{
+	print_fstab root "$root_uuid" / ext4 rw,discard,errors=remount-ro 0 1
+	print_fstab efi "$efi_uuid" /efi vfat uid=root,gid=root,umask=022,showexec 0 0
+}
 
 echo '- Running additional setup in chroot.'
-arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
+arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 	set -eEuo pipefail
 	trap 'echo "Error: \`$BASH_COMMAND\` exited with status $?"' ERR
 
@@ -150,11 +164,11 @@ arch-chroot -- "$mount_dir" /bin/bash -s -- "$loop_dev" <<-'EOS'
 	mkinitcpio --nocolor --preset linux
 
 	echo '-- Configuring grub.'
-	grub-install --target=i386-pc -- "$1"
+	grub-install --target=x86_64-efi --efi-directory=/efi --no-nvram --removable
 	cat <<-'EOF' > /etc/default/grub
 		# GRUB boot loader configuration
-		GRUB_CMDLINE_LINUX="console=ttyS0,38400n8 net.ifnames=0 elevator=noop scsi_mod.use_blk_mq=Y"
-		GRUB_PRELOAD_MODULES="part_gpt part_msdos"
+		GRUB_CMDLINE_LINUX="console=ttyS0,38400n8 net.ifnames=0 scsi_mod.use_blk_mq=Y"
+		GRUB_PRELOAD_MODULES="part_gpt"
 		GRUB_TIMEOUT=0
 		GRUB_DISABLE_RECOVERY=true
 	EOF
@@ -165,7 +179,7 @@ echo '- Cleaning up and finalizing the image.'
 > "$mount_dir/etc/machine-id"
 rm -- "$mount_dir/var/log/pacman.log"
 rm -f "$mount_dir/var/cache/pacman/pkg/*"
-umount -- "$mount_dir"
+umount --recursive -- "$mount_dir"
 unset mount_dir
 
 echo '- Building the compressed image.'

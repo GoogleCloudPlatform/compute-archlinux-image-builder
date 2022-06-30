@@ -62,7 +62,7 @@ You can build the Arch Linux image yourself with the following procedure:
 1.  Install the required dependencies and build the image
 
     ```console
-    $ sudo pacman -S --needed arch-install-scripts e2fsprogs
+    $ sudo pacman -S --needed arch-install-scripts dosfstools e2fsprogs
     $ git clone https://github.com/GoogleCloudPlatform/compute-archlinux-image-builder.git
     $ cd compute-archlinux-image-builder
     $ sudo ./build-arch-gce
@@ -88,7 +88,7 @@ You can build the Arch Linux image yourself with the following procedure:
     ```console
     $ gcloud compute images create IMAGE_NAME \
           --source-uri=gs://BUCKET_NAME/arch-vDATE.tar.gz \
-          --guest-os-features=VIRTIO_SCSI_MULTIQUEUE
+          --guest-os-features=GVNIC,UEFI_COMPATIBLE,VIRTIO_SCSI_MULTIQUEUE
     ```
 
 You can now create new instances with your custom image:

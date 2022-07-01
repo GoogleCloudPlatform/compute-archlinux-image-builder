@@ -1,0 +1,3 @@
+## The root and efi partition is automatically mounted by systemd.
+## This bind only to make the next kernel update installed to efi.
+/efi /boot none defaults,bind 0 0

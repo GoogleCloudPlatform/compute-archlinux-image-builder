@@ -60,7 +60,9 @@ mount -- "$root_dev" "$mount_dir"
 
 echo '- Mounting the EFI partition.'
 mkdir -- "$mount_dir/efi"
+mkdir -- "$mount_dir/boot"
 mount -- "$efi_dev" "$mount_dir/efi"
+mount --bind -- "$mount_dir/efi" $mount_dir/boot
 
 echo '- Installing Arch Linux.'
 append_gce_repo() {
@@ -76,23 +78,11 @@ append_gce_repo() {
 cp /etc/pacman.conf "$work_dir"
 append_gce_repo "$work_dir/pacman.conf"
 pacstrap -G -M -C "$work_dir/pacman.conf" -- "$mount_dir" \
-	base linux grub dosfstools e2fsprogs dhclient openssh sudo google-compute-engine growpartfs
+	base linux dosfstools e2fsprogs dhclient openssh sudo google-compute-engine growpartfs
 append_gce_repo "$mount_dir/etc/pacman.conf"
 
 echo '- Configuring fstab.'
-root_uuid=$(lsblk --noheadings --raw --output UUID -- "$root_dev")
-efi_uuid=$(lsblk --noheadings --raw --output UUID -- "$efi_dev")
-print_fstab() {
-	printf '# LABEL=%s\n' "$1"
-	printf 'UUID=%-20s' "$2"
-	printf '\t%-10s' "$3" "$4" "$5"
-	printf '\t%s %s' "$6" "$7"
-	printf '\n\n'
-} >> "$mount_dir/etc/fstab"
-{
-	print_fstab root "$root_uuid" / ext4 rw,discard,errors=remount-ro 0 1
-	print_fstab efi "$efi_uuid" /efi vfat uid=root,gid=root,umask=022,showexec 0 0
-}
+cp -f -- ./sys/etc/fstab $mount_dir/etc/fstab
 
 echo '- Running additional setup in chroot.'
 arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
@@ -154,7 +144,7 @@ arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 	gawk -i assert -i inplace '
 		/^MODULES=/ { $0 = "MODULES=(virtio_pci virtio_scsi sd_mod ext4)"; ++f1 }
 		/^BINARIES=/ { $0 = "BINARIES=(fsck fsck.ext4)"; ++f2 }
-		/^HOOKS=/ { $0 = "HOOKS=(base modconf)"; ++f3 }
+		/^HOOKS=/ { $0 = "HOOKS=(base systemd autodetect modconf block filesystems fsck)"; ++f3 }
 		{ print } END { assert(f1 * f2 * f3 == 1, "f == 1") }' /etc/mkinitcpio.conf
 	gawk -i assert -i inplace '
 		/^PRESETS=/ { $0 = "PRESETS=(default)"; ++f }
@@ -163,17 +153,17 @@ arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 	rm /boot/initramfs-linux-fallback.img
 	mkinitcpio --nocolor --preset linux
 
-	echo '-- Configuring grub.'
-	grub-install --target=x86_64-efi --efi-directory=/efi --no-nvram --removable
-	cat <<-'EOF' > /etc/default/grub
-		# GRUB boot loader configuration
-		GRUB_CMDLINE_LINUX="console=ttyS0,38400n8 net.ifnames=0 scsi_mod.use_blk_mq=Y"
-		GRUB_PRELOAD_MODULES="part_gpt"
-		GRUB_TIMEOUT=0
-		GRUB_DISABLE_RECOVERY=true
-	EOF
-	grub-mkconfig -o /boot/grub/grub.cfg
+	echo '-- Running boot loader.'
+	bootctl install
 EOS
+
+echo '- Configuring boot loader.'
+cp -f -- ./sys/efi/loader/loader.conf $mount_dir/efi/loader/
+cp -f -- ./sys/efi/loader/entries/arch.conf $mount_dir/efi/loader/entries/
+
+echo '- Configuring pacman hooks.'
+mkdir -p -- "$mount_dir/etc/pacman.d/hooks"
+cp -f -- ./sys/etc/pacman.d/hooks/00-systemd-boot.hook $mount_dir/etc/pacman.d/hooks/
 
 echo '- Cleaning up and finalizing the image.'
 > "$mount_dir/etc/machine-id"

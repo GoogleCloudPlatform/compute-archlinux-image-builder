@@ -9,11 +9,11 @@ installation, while still allowing it to be fully functional and optimized for
 Compute Engine.  Notable choices made and differences compared to a standard
 Arch Linux installation are the following:
 
-- GRUB is used with BIOS-based boot and a GPT partition table.
+- GRUB is used with a UEFI-based boot and a GPT partition table.
 - Serial console logging is enabled from kernel command line and journald is
   configured to forward to it.
-- Block multiqueue and elevator noop are configured from kernel command line to
-  optimize Compute Engine disk performance.
+- Block multiqueue is configured from the kernel command line to optimize
+  Compute Engine disk performance.
 - A minimal initcpio is configured for booting on Compute Engine virtual
   machines.
 - Root filesystem is ext4.
@@ -35,11 +35,10 @@ Arch Linux installation are the following:
 - Sudo is installed.  Permission to use sudo is managed automatically by Linux
   Guest Environment.
 - Root partition and filesystem are automatically extended at boot using
-  [growpart](https://launchpad.net/cloud-utils), to support dynamic disk
-  resizing.
+  systemd-repart and systemd-growfs, to support dynamic disk resizing.
 - An additional Pacman repository is used to install and keep the [Linux Guest
-  Environment](https://aur.archlinux.org/packages/google-compute-engine/) and
-  [growpartfs](https://aur.archlinux.org/packages/growpartfs/) packages up to date.
+  Environment](https://aur.archlinux.org/packages/google-compute-engine/)
+  packages up to date.
 
 ## Prebuilt Images
 

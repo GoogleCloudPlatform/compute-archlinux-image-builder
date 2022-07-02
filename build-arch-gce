@@ -76,7 +76,7 @@ append_gce_repo() {
 cp /etc/pacman.conf "$work_dir"
 append_gce_repo "$work_dir/pacman.conf"
 pacstrap -G -M -C "$work_dir/pacman.conf" -- "$mount_dir" \
-	base linux grub dosfstools e2fsprogs dhclient openssh sudo google-compute-engine growpartfs
+	base linux grub dosfstools e2fsprogs dhclient openssh sudo google-compute-engine
 append_gce_repo "$mount_dir/etc/pacman.conf"
 
 echo '- Configuring fstab.'
@@ -90,7 +90,7 @@ print_fstab() {
 	printf '\n\n'
 } >> "$mount_dir/etc/fstab"
 {
-	print_fstab root "$root_uuid" / ext4 rw,discard,errors=remount-ro 0 1
+	print_fstab root "$root_uuid" / ext4 rw,discard,errors=remount-ro,x-systemd.growfs 0 1
 	print_fstab efi "$efi_uuid" /efi vfat uid=root,gid=root,umask=022,showexec 0 0
 }
 
@@ -147,14 +147,26 @@ arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 	EOF
 	systemctl --quiet enable pacman-init.service
 
+	echo '-- Configuring systemd-repart.'
+	mkdir /etc/repart.d
+	cat <<-'EOF' > /etc/repart.d/root.conf
+		[Partition]
+		Type=root
+	EOF
+	mkdir /etc/systemd/system/systemd-repart.service.d
+	cat <<-'EOF' > /etc/systemd/system/systemd-repart.service.d/override.conf
+		[Unit]
+		Before=systemd-growfs@-.service
+	EOF
+
 	echo '-- Enabling other services.'
-	systemctl --quiet enable dhclient@eth0.service growpartfs@-.service
+	systemctl --quiet enable dhclient@eth0.service
 
 	echo '-- Configuring initcpio.'
 	gawk -i assert -i inplace '
 		/^MODULES=/ { $0 = "MODULES=(virtio_pci virtio_scsi sd_mod ext4)"; ++f1 }
 		/^BINARIES=/ { $0 = "BINARIES=(fsck fsck.ext4)"; ++f2 }
-		/^HOOKS=/ { $0 = "HOOKS=(base modconf)"; ++f3 }
+		/^HOOKS=/ { $0 = "HOOKS=(systemd modconf)"; ++f3 }
 		{ print } END { assert(f1 * f2 * f3 == 1, "f == 1") }' /etc/mkinitcpio.conf
 	gawk -i assert -i inplace '
 		/^PRESETS=/ { $0 = "PRESETS=(default)"; ++f }

@@ -9,7 +9,7 @@ installation, while still allowing it to be fully functional and optimized for
 Compute Engine.  Notable choices made and differences compared to a standard
 Arch Linux installation are the following:
 
-- GRUB is used with a UEFI-based boot and a GPT partition table.
+- systemd-boot is used with a UEFI-based boot and a GPT partition table.
 - Serial console logging is enabled from kernel command line and journald is
   configured to forward to it.
 - Block multiqueue is configured from the kernel command line to optimize

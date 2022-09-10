@@ -40,7 +40,7 @@ echo '- Setting up a loop device and partitioning the image.'
 loop_dev=$(losetup --find --partscan --show -- "$disk_raw")
 sfdisk --quiet -- "$loop_dev" <<-'EOF'
 	label:gpt
-	type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,size=300MiB,name=efi
+	type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B,size=300MiB,name=boot
 	type=4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709,name=root
 EOF
 
@@ -49,18 +49,18 @@ root_dev=${loop_dev}p2
 mkfs.ext4 -q -L root -- "$root_dev"
 tune2fs -c 0 -i 0 -- "$root_dev"
 
-echo '- Formatting the EFI partition.'
-efi_dev=${loop_dev}p1
-mkfs.vfat -F32 -n EFI -- "$efi_dev"
+echo '- Formatting the boot partition.'
+boot_dev=${loop_dev}p1
+mkfs.vfat -F32 -n boot -- "$boot_dev"
 
 echo '- Mounting the root partition.'
 mount_dir=$work_dir/disk.mnt
 mkdir -- "$mount_dir"
 mount -- "$root_dev" "$mount_dir"
 
-echo '- Mounting the EFI partition.'
-mkdir -- "$mount_dir/efi"
-mount -- "$efi_dev" "$mount_dir/efi"
+echo '- Mounting the boot partition.'
+mkdir -- "$mount_dir/boot"
+mount -- "$boot_dev" "$mount_dir/boot"
 
 echo '- Installing Arch Linux.'
 append_gce_repo() {
@@ -76,12 +76,12 @@ append_gce_repo() {
 cp /etc/pacman.conf "$work_dir"
 append_gce_repo "$work_dir/pacman.conf"
 pacstrap -G -M -C "$work_dir/pacman.conf" -- "$mount_dir" \
-	base linux grub dosfstools e2fsprogs dhclient openssh sudo google-compute-engine
+	base linux dosfstools e2fsprogs dhclient openssh sudo google-compute-engine
 append_gce_repo "$mount_dir/etc/pacman.conf"
 
 echo '- Configuring fstab.'
 root_uuid=$(lsblk --noheadings --raw --output UUID -- "$root_dev")
-efi_uuid=$(lsblk --noheadings --raw --output UUID -- "$efi_dev")
+boot_uuid=$(lsblk --noheadings --raw --output UUID -- "$boot_dev")
 print_fstab() {
 	printf '# LABEL=%s\n' "$1"
 	printf 'UUID=%-20s' "$2"
@@ -91,7 +91,7 @@ print_fstab() {
 } >> "$mount_dir/etc/fstab"
 {
 	print_fstab root "$root_uuid" / ext4 rw,discard,errors=remount-ro,x-systemd.growfs 0 1
-	print_fstab efi "$efi_uuid" /efi vfat uid=root,gid=root,umask=022,showexec 0 0
+	print_fstab boot "$boot_uuid" /boot vfat uid=root,gid=root,umask=022,showexec 0 0
 }
 
 echo '- Running additional setup in chroot.'
@@ -175,16 +175,15 @@ arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 	rm /boot/initramfs-linux-fallback.img
 	mkinitcpio --nocolor --preset linux
 
-	echo '-- Configuring grub.'
-	grub-install --target=x86_64-efi --efi-directory=/efi --no-nvram --removable
-	cat <<-'EOF' > /etc/default/grub
-		# GRUB boot loader configuration
-		GRUB_CMDLINE_LINUX="console=ttyS0,38400n8 net.ifnames=0 scsi_mod.use_blk_mq=Y"
-		GRUB_PRELOAD_MODULES="part_gpt"
-		GRUB_TIMEOUT=0
-		GRUB_DISABLE_RECOVERY=true
+	echo '-- Configuring systemd-boot.'
+	bootctl install --no-variables --esp-path=/boot
+	echo 'default arch.conf' > /boot/loader/loader.conf
+	cat <<-'EOF' > /boot/loader/entries/arch.conf
+		title Arch Linux
+		linux /vmlinuz-linux
+		initrd /initramfs-linux.img
+		options root="LABEL=root" rw console=ttyS0,38400n8 net.ifnames=0 scsi_mod.use_blk_mq=Y
 	EOF
-	grub-mkconfig -o /boot/grub/grub.cfg
 EOS
 
 echo '- Cleaning up and finalizing the image.'

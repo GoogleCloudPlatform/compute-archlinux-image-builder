@@ -51,7 +51,7 @@ tune2fs -c 0 -i 0 -- "$root_dev"
 
 echo '- Formatting the boot partition.'
 boot_dev=${loop_dev}p1
-mkfs.vfat -F32 -n boot -- "$boot_dev"
+mkfs.vfat -F32 -n BOOT -- "$boot_dev"
 
 echo '- Mounting the root partition.'
 mount_dir=$work_dir/disk.mnt

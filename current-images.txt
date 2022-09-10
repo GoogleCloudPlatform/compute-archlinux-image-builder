@@ -7,3 +7,4 @@ arch-v20210124  arch-linux-gce  arch                READY
 arch-v20220315  arch-linux-gce  arch                READY
 arch-v20220514  arch-linux-gce  arch                READY
 arch-v20220630  arch-linux-gce  arch                READY
+arch-v20220910  arch-linux-gce  arch                READY

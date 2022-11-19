@@ -18,7 +18,7 @@ Arch Linux installation are the following:
   machines.
 - Root filesystem is ext4.
 - Locale is set to en_US.UTF-8 and timezone is set to UTC.
-- Network is configured through dhclient.
+- Network is configured through systemd-networkd.
 - Systemd-timesyncd is enabled and configured to use the Compute Engine metadata
   server.
 - Pacman keyring is configured to be built and initialized on first boot.

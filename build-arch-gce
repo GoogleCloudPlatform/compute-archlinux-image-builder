@@ -164,7 +164,7 @@ arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 
 	echo '-- Configuring initcpio.'
 	gawk -i assert -i inplace '
-		/^MODULES=/ { $0 = "MODULES=(virtio_pci virtio_scsi sd_mod ext4)"; ++f1 }
+		/^MODULES=/ { $0 = "MODULES=(virtio_pci virtio_scsi sd_mod ext4 nvme)"; ++f1 }
 		/^BINARIES=/ { $0 = "BINARIES=(fsck fsck.ext4)"; ++f2 }
 		/^HOOKS=/ { $0 = "HOOKS=(systemd modconf)"; ++f3 }
 		{ print } END { assert(f1 * f2 * f3 == 1, "f == 1") }' /etc/mkinitcpio.conf

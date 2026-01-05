@@ -18,7 +18,7 @@ $ gcloud auth login
 
 $ gcloud config set project arch-linux-gce
 
-$ gsutil cp "arch-v${DATE}.tar.gz" gs://arch-linux-gce-work
+$ gcloud storage cp "arch-v${DATE}.tar.gz" gs://arch-linux-gce-work
 
 $ gcloud compute images create "arch-v${DATE}" \
     --source-uri="gs://arch-linux-gce-work/arch-v${DATE}.tar.gz" \
@@ -26,7 +26,7 @@ $ gcloud compute images create "arch-v${DATE}" \
     --description="Arch Linux built on ${DATE}." \
     --family=arch
 
-$ gsutil rm "gs://arch-linux-gce-work/arch-v${DATE}.tar.gz"
+$ gcloud storage rm "gs://arch-linux-gce-work/arch-v${DATE}.tar.gz"
 
 $ gcloud compute instances create "arch-v${DATE}-test" --image="arch-v${DATE}"
 
@@ -53,7 +53,7 @@ https://wiki.archlinux.org/index.php/Pacman/Tips_and_tricks#Custom_local_reposit
 
     ```console
     $ mkdir -p repo
-    $ gsutil rsync gs://arch-linux-gce/repo repo/
+    $ gcloud storage rsync gs://arch-linux-gce/repo repo/
     ```
 
 2.  Build packages and copy into the repo
@@ -75,9 +75,9 @@ https://wiki.archlinux.org/index.php/Pacman/Tips_and_tricks#Custom_local_reposit
 
     ```console
     $ cd ..
-    $ gsutil rsync repo/ gs://arch-linux-gce/repo
+    $ gcloud storage rsync repo/ gs://arch-linux-gce/repo
     ```
 
 Note that if deleting packages (use `repo-remove gce.db.tar.gz PACKAGE_NAME`),
-`gsutil rsync` will not delete the old package files. Use `gsutil rm` if
+`gcloud storage rsync` will not delete the old package files. Use `gcloud storage rm` if
 required.

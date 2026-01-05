@@ -78,8 +78,8 @@ You can build the Arch Linux image yourself with the following procedure:
 3.  Copy the image file to Google Cloud Storage:
 
     ```console
-    $ gsutil mb gs://BUCKET_NAME
-    $ gsutil cp arch-vDATE.tar.gz gs://BUCKET_NAME
+    $ gcloud storage buckets create gs://BUCKET_NAME
+    $ gcloud storage cp arch-vDATE.tar.gz gs://BUCKET_NAME
     ```
 
 4.  Import the image file to Google Cloud Engine as a new custom image:
@@ -100,7 +100,7 @@ The Google Cloud Storage file is no longer needed, so you can delete it if you
 want:
 
 ```console
-$ gsutil rm gs://BUCKET_NAME/arch-vDATE.tar.gz
+$ gcloud storage rm gs://BUCKET_NAME/arch-vDATE.tar.gz
 ```
 
 ## Contributing Changes

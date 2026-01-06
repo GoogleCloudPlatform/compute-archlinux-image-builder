@@ -76,7 +76,7 @@ append_gce_repo() {
 cp /etc/pacman.conf "$work_dir"
 append_gce_repo "$work_dir/pacman.conf"
 pacstrap -G -M -C "$work_dir/pacman.conf" -- "$mount_dir" \
-	base linux dosfstools e2fsprogs dhclient openssh sudo google-compute-engine
+	base linux dosfstools e2fsprogs openssh sudo google-compute-engine
 append_gce_repo "$mount_dir/etc/pacman.conf"
 
 echo '- Configuring fstab.'
@@ -112,6 +112,22 @@ arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 		{ print } END { assert(f == 1, "f == 1") }' /etc/locale.gen
 	locale-gen
 	echo 'LANG=en_US.UTF-8' > /etc/locale.conf
+
+	echo '-- Configuring network.'
+	cat <<-'EOF' > /etc/systemd/network/05-eth0.network
+		[Match]
+		Name=eth0
+
+		[Network]
+		DHCP=yes
+
+		[DHCPv4]
+		UseDomains=yes
+
+		[DHCPv6]
+		UseDomains=yes
+	EOF
+	systemctl --quiet enable systemd-networkd.service systemd-resolved.service
 
 	echo '-- Configuring journald.'
 	gawk -i assert -i inplace '
@@ -158,9 +174,6 @@ arch-chroot -- "$mount_dir" /bin/bash -s <<-'EOS'
 		[Unit]
 		Before=systemd-growfs@-.service
 	EOF
-
-	echo '-- Enabling other services.'
-	systemctl --quiet enable dhclient@eth0.service
 
 	echo '-- Configuring initcpio.'
 	gawk -i assert -i inplace '
